@@ -1,0 +1,2930 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Liga de Pádel Escolar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --bg:#0b1020;
+    --bg2:#131a2e;
+    --panel:#18213a;
+    --panel2:#202b49;
+    --line:rgba(255,255,255,.09);
+    --line2:rgba(255,255,255,.16);
+    --txt:#edf2ff;
+    --muted:#9aa7c4;
+    --gold:#ffbf3c;
+    --green:#43d18d;
+    --red:#ff6b7a;
+    --blue:#64a7ff;
+    --violet:#b48cff;
+    --cyan:#45d6d9;
+    --radius:16px;
+    --shadow:0 12px 32px rgba(0,0,0,.28);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:
+      radial-gradient(circle at top left, rgba(100,167,255,.12), transparent 22%),
+      radial-gradient(circle at top right, rgba(180,140,255,.09), transparent 20%),
+      linear-gradient(180deg,#09101d,#0d1424 40%,#0b1020);
+      color:var(--txt);font-family:Inter,system-ui,sans-serif;min-height:100vh}
+  .app{max-width:1240px;margin:0 auto;padding:18px}
+  .topbar{position:sticky;top:0;z-index:20;background:rgba(11,16,32,.88);backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);padding:14px 18px;margin:0 -18px 18px}
+  .topbar-row{max-width:1240px;margin:0 auto;display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:14px}
+  .logo-box{width:54px;height:54px;border-radius:18px;background:linear-gradient(135deg,#25345d,#12192e);border:1px solid var(--line2);display:grid;place-items:center;overflow:hidden;box-shadow:var(--shadow)}
+  .logo-box img{width:100%;height:100%;object-fit:cover}
+  .logo-fallback{font-size:24px}
+  .brand h1{font-size:23px;line-height:1.1;margin:0;font-weight:800;letter-spacing:-.02em}
+  .brand p{margin:4px 0 0;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.16em}
+  .top-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .bottom-admin-wrap{max-width:1240px;margin:22px auto 0;padding-top:10px;border-top:1px solid var(--line);display:flex;justify-content:center}
+  .bottom-admin-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center}
+  .spectator-note{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}
+
+  .admin-chip{display:none;padding:8px 12px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(67,209,141,.12);color:var(--green);border:1px solid rgba(67,209,141,.28)}
+  .admin-chip.show{display:inline-flex}
+  .btn,.tab-btn,.seg-btn{border:1px solid var(--line2);background:var(--panel);color:var(--txt);padding:10px 14px;border-radius:12px;cursor:pointer;font:600 14px Inter,sans-serif;transition:.18s;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+  .btn:hover,.tab-btn:hover,.seg-btn:hover{transform:translateY(-1px);border-color:rgba(255,255,255,.28)}
+  .btn.primary{background:linear-gradient(135deg,rgba(100,167,255,.22),rgba(100,167,255,.12));color:#cfe1ff;border-color:rgba(100,167,255,.35)}
+  .btn.warn{background:linear-gradient(135deg,rgba(255,191,60,.16),rgba(255,191,60,.08));color:#ffd56d;border-color:rgba(255,191,60,.33)}
+  .btn.good{background:linear-gradient(135deg,rgba(67,209,141,.16),rgba(67,209,141,.08));color:#7deab0;border-color:rgba(67,209,141,.35)}
+  .btn.bad{background:linear-gradient(135deg,rgba(255,107,122,.16),rgba(255,107,122,.08));color:#ff96a0;border-color:rgba(255,107,122,.32)}
+  .btn.small{padding:7px 10px;border-radius:10px;font-size:12px}
+  .nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .tab-btn.active{background:linear-gradient(135deg,rgba(255,191,60,.16),rgba(255,191,60,.08));color:#ffd56d;border-color:rgba(255,191,60,.35)}
+  .tab-btn.news-tab.has-news{
+    position:relative;
+    border-color:rgba(69,214,217,.38);
+    color:#bff7f8;
+    background:linear-gradient(135deg,rgba(69,214,217,.14),rgba(180,140,255,.10));
+    box-shadow:0 0 0 1px rgba(69,214,217,.08) inset, 0 10px 24px rgba(69,214,217,.08);
+    animation:newsTabPulse 2.4s ease-in-out infinite;
+  }
+  .tab-btn.news-tab.has-news:hover{border-color:rgba(69,214,217,.62)}
+  .tab-btn.news-tab.has-news.active{
+    background:linear-gradient(135deg,rgba(69,214,217,.24),rgba(180,140,255,.16));
+    color:#efffff;
+    border-color:rgba(69,214,217,.68);
+    box-shadow:0 0 0 1px rgba(69,214,217,.18) inset, 0 12px 28px rgba(69,214,217,.14);
+  }
+  .tab-btn.news-tab.has-news::before{
+    content:'•';
+    font-size:16px;
+    line-height:1;
+    color:#7df0f2;
+    text-shadow:0 0 10px rgba(69,214,217,.55);
+    animation:newsDotFloat 1.8s ease-in-out infinite;
+  }
+  @keyframes newsTabPulse{
+    0%,100%{transform:translateY(0)}
+    50%{transform:translateY(-1px)}
+  }
+  @keyframes newsDotFloat{
+    0%,100%{transform:translateY(0);opacity:1}
+    50%{transform:translateY(-1px);opacity:.75}
+  }
+  .grid{display:grid;gap:16px}
+  .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .card{background:linear-gradient(180deg,rgba(24,33,58,.98),rgba(19,26,46,.98));border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+  .card h3,.card h2{margin:0 0 12px}
+  .card-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+  .muted{color:var(--muted)}
+  .pair-stack{display:flex;flex-direction:column;gap:2px}
+  .pair-line{font-size:14px;line-height:1.4;font-weight:500;color:var(--txt)}
+  .pair-meta{font-size:12px;line-height:1.3;color:var(--muted)}
+  .pill-row{display:flex;flex-wrap:wrap;gap:10px}
+  .league-pill{padding:10px 16px;border-radius:999px;border:1px solid var(--line2);background:var(--panel);cursor:pointer;font-weight:700}
+  .league-pill.active{color:#fff}
+  .future.active{background:rgba(255,191,60,.16);border-color:rgba(255,191,60,.35);color:#ffd56d}
+  .pro.active{background:rgba(100,167,255,.16);border-color:rgba(100,167,255,.35);color:#c9ddff}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px}
+  .stat{background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .stat small{display:block;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;font-size:11px}
+  .stat strong{font-size:28px;font-family:"JetBrains Mono",monospace}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+  tr:last-child td{border-bottom:none}
+  .table-wrap{overflow:auto}
+  .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;border:1px solid var(--line2);font-size:12px;font-weight:700}
+  .badge.ok{color:#83eab5;background:rgba(67,209,141,.12);border-color:rgba(67,209,141,.28)}
+  .badge.no{color:#ff98a5;background:rgba(255,107,122,.12);border-color:rgba(255,107,122,.24)}
+  .badge.gold{color:#ffd56d;background:rgba(255,191,60,.12);border-color:rgba(255,191,60,.28)}
+  .badge.blue{color:#d3e4ff;background:rgba(100,167,255,.12);border-color:rgba(100,167,255,.28)}
+  .badge.violet{color:#d9c7ff;background:rgba(180,140,255,.12);border-color:rgba(180,140,255,.28)}
+  .form-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:700}
+  .field input,.field select,.field textarea{width:100%;border:1px solid var(--line2);background:#0f1730;color:var(--txt);border-radius:12px;padding:11px 12px;font:500 14px Inter,sans-serif}
+  .field textarea{min-height:88px;resize:vertical}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:rgba(100,167,255,.42);box-shadow:0 0 0 4px rgba(100,167,255,.12)}
+  .c1{grid-column:span 1}.c2{grid-column:span 2}.c3{grid-column:span 3}.c4{grid-column:span 4}
+  .c5{grid-column:span 5}.c6{grid-column:span 6}.c7{grid-column:span 7}.c8{grid-column:span 8}
+  .c9{grid-column:span 9}.c10{grid-column:span 10}.c12{grid-column:span 12}
+  .subtabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .seg-btn.active{background:rgba(255,255,255,.08)}
+  .empty{padding:30px 16px;text-align:center;color:var(--muted)}
+  .days{display:flex;gap:8px;flex-wrap:wrap}
+  .day-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid var(--line2);background:#101834;border-radius:999px}
+  .day-chip input{accent-color:var(--blue)}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(80px);opacity:0;transition:.25s;background:#101833;border:1px solid var(--line2);border-radius:999px;padding:11px 16px;z-index:30;font-weight:700;box-shadow:var(--shadow)}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+  .toast.ok{color:#83eab5}.toast.err{color:#ff97a5}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:18px;z-index:40}
+  .overlay.open{display:flex}
+  .modal{width:min(920px,100%);max-height:90vh;overflow:auto;background:linear-gradient(180deg,#19233e,#121a2f);border:1px solid var(--line2);border-radius:20px;padding:18px;box-shadow:var(--shadow)}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+  .close-btn{background:none;border:none;color:var(--muted);font-size:28px;cursor:pointer}
+  .close-btn:hover{color:var(--txt)}
+  .match-item{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--line)}
+  .match-item:last-child{border-bottom:none}
+  .match-pair-block{flex:1 1 240px;min-width:min(100%,240px)}
+  .match-vs{display:inline-flex;align-items:center;justify-content:center;min-width:52px;padding:7px 10px;border-radius:999px;background:rgba(100,167,255,.12);border:1px solid rgba(100,167,255,.24);color:#d3e4ff;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+  .pair-name,.pair-sub{font-size:clamp(14px,1.15rem,16px);line-height:1.45;font-weight:500;color:var(--txt);overflow-wrap:anywhere;word-break:break-word}
+  .pair-sub{opacity:.94}
+  .score{font-family:"JetBrains Mono",monospace;font-size:18px;font-weight:700;min-width:54px;text-align:center}
+  .match-admin-row{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--line)}
+  .match-admin-row:last-child{border-bottom:none}
+  .match-admin-main{display:flex;align-items:flex-start;gap:12px;flex:1 1 320px;min-width:260px}
+  .match-admin-teams{display:flex;flex-direction:column;gap:8px;min-width:0}
+  .match-team-line{font-size:clamp(14px,1.05rem,16px);line-height:1.45;font-weight:500;color:var(--txt);overflow-wrap:anywhere;word-break:break-word}
+  .match-admin-side{display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:190px}
+  .match-result-actions{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .match-admin-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  @media (max-width: 720px){
+    .match-admin-row{gap:12px}
+    .match-admin-side{align-items:flex-start;min-width:100%;padding-left:44px}
+    .match-result-actions{align-items:flex-start}
+    .match-admin-actions{justify-content:flex-start}
+  }
+  .admin-only{display:none}
+  .admin-only.show{display:block}
+  .small-note{font-size:12px;color:var(--muted)}
+  .match-note{width:100%;margin-top:8px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line);font-size:13px;line-height:1.45;color:var(--txt)}
+  .match-note strong{color:#ffd56d}
+  .match-note.muted-note strong{color:#d3e4ff}
+  .resource-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .week-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .group-card{background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:14px;padding:14px}
+
+  .pos-badge{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:34px;padding:0 10px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid var(--line2);font-weight:800}
+  .pos-badge.top1{background:rgba(255,191,60,.18);border-color:rgba(255,191,60,.38);color:#ffd56d}
+  .pos-badge.top2{background:rgba(194,201,214,.16);border-color:rgba(194,201,214,.34);color:#e7edf7}
+  .pos-badge.top3{background:rgba(205,127,50,.18);border-color:rgba(205,127,50,.34);color:#e5b28a}
+  .col-dif,.col-pts{font-weight:800;text-align:center}
+  .col-dif{background:rgba(255,255,255,.03)}
+  .col-pts{background:rgba(255,191,60,.14);color:#ffd56d}
+  th.col-dif,th.col-pts{position:relative}
+
+  .group-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .chip-list{display:flex;gap:8px;flex-wrap:wrap}
+  .pair-chip{display:inline-flex;align-items:center;gap:8px;padding:7px 10px;background:#101834;border:1px solid var(--line2);border-radius:999px;font-size:12px}
+  .pair-chip button{all:unset;cursor:pointer;color:#ff97a5;font-weight:700}
+  .hero{display:grid;grid-template-columns:1.3fr .7fr;gap:16px}
+  .hero-box{min-height:100%}
+  .callout{background:linear-gradient(135deg,rgba(255,191,60,.12),rgba(100,167,255,.1));border:1px solid rgba(255,255,255,.1);padding:18px;border-radius:18px}
+  .mono{font-family:"JetBrains Mono",monospace}
+  .hidden{display:none!important}
+  @media (max-width:900px){
+    .grid-2,.grid-3,.grid-4,.hero{grid-template-columns:1fr}
+  }
+  .news-hero{display:grid;gap:16px}
+  .news-panel{background:linear-gradient(180deg,rgba(24,33,58,.98),rgba(19,26,46,.98));border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:var(--shadow)}
+  .news-text{font-size:clamp(20px,3vw,34px);line-height:1.35;font-weight:700;white-space:pre-wrap}
+  .news-image-wrap{border-radius:20px;overflow:hidden;border:1px solid var(--line2);background:rgba(255,255,255,.03)}
+  .news-image-wrap img{display:block;width:100%;height:auto;max-height:72vh;object-fit:contain;background:#0c1326}
+  @media (max-width:720px){
+    .c1,.c2,.c3,.c4,.c5,.c6,.c7,.c8,.c9,.c10,.c12{grid-column:span 12}
+    .app{padding:12px}
+    .topbar{margin:0 -12px 14px;padding:12px}
+    .pair-line{font-size:13px}
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-row">
+    <div class="brand">
+      <div class="logo-box" id="brandLogo"><div class="logo-fallback">🎾</div></div>
+      <div>
+        <h1 id="brandTitle">Liga de Pádel Escolar</h1>
+        <p id="brandSeason">Temporada 2025–2026</p>
+      </div>
+    </div>
+    <div class="top-actions"></div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="nav" id="mainTabs"></div>
+  <div id="view"></div>
+  <div class="bottom-admin-wrap">
+    <div>
+      <div class="bottom-admin-actions">
+        <span class="admin-chip" id="adminChip">✓ Admin activo</span>
+        <button class="btn" id="adminToggleBtn">Acceso administrador</button>
+      </div>
+      <div class="spectator-note" id="spectatorNote"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="modalTitle">Modal</h2>
+      <button class="close-btn" onclick="closeModal()">×</button>
+    </div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+const DAYS = ['Lunes','Martes','Miércoles','Jueves','Viernes'];
+const COURSES = ['1º ESO','2º ESO','3º ESO','4º ESO','1º Bachillerato','Profesor/a'];
+const LEVELS = ['Iniciación','Básico','Medio','Avanzado','Competición'];
+const LOCAL_BACKUP_KEY = 'padel_escolar_firebase_backup_v1';
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAuW0_EFV_E_GnZjfJ6HYzG2ko50fjzMi8",
+  authDomain: "escolapiospadeltour.firebaseapp.com",
+  databaseURL: "https://escolapiospadeltour-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "escolapiospadeltour",
+  storageBucket: "escolapiospadeltour.firebasestorage.app",
+  messagingSenderId: "577721250781",
+  appId: "1:577721250781:web:881da445f32121cc617c34",
+  measurementId: "G-CDD185L5VS"
+};
+const FIREBASE_COLLECTION = 'padel_apps';
+const FIREBASE_DOCUMENT_ID = 'liga_escolar_principal';
+
+const DEFAULT_STATE = {
+  config: {
+    title: 'Liga de Pádel Escolar',
+    season: '2025–2026',
+    adminPassword: 'admin123',
+    logo: null,
+    newsImage: null,
+    normsImage: null,
+    newsText: 'Sin novedades'
+  },
+  ui: {
+    tab: 'inicio',
+    adminTab: 'config',
+    selectedLeagueId: 'future',
+    showPostponedList: false
+  },
+  resources: [],
+  leagues: [
+    {
+      id: 'future',
+      name: 'Liga Future',
+      subtitle: '1º y 2º ESO',
+      accent: 'future',
+      pairs: [],
+      groups: [],
+      matches: [],
+      playoffMatches: []
+    },
+    {
+      id: 'pro',
+      name: 'Liga Pro',
+      subtitle: '3º y 4º ESO · 1º Bachillerato · Profesores',
+      accent: 'pro',
+      pairs: [],
+      groups: [],
+      matches: [],
+      playoffMatches: []
+    }
+  ]
+};
+
+let state = loadState();
+if(isPublicMode()) state.ui.tab = 'normas';
+let isAdmin = false;
+let modalCleanup = null;
+let firebaseApp = null;
+let firestoreDb = null;
+let firebaseDocRef = null;
+let firebaseUnsubscribe = null;
+let firebaseReady = false;
+let remoteStateLoaded = false;
+let saveTimer = null;
+let suppressRemoteEcho = false;
+
+function deepClone(v){ return JSON.parse(JSON.stringify(v)); }
+function uid(prefix='id'){ return prefix + '_' + Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-4); }
+function isPublicMode(){
+  try{
+    const params = new URLSearchParams(window.location.search);
+    return ['publico','public','espectador','viewer'].includes((params.get('modo')||params.get('view')||'').toLowerCase());
+  }catch(e){ return false; }
+}
+
+function firebaseConfigured(){
+  return FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && !String(FIREBASE_CONFIG.apiKey).startsWith('PEGA_AQUI');
+}
+function persistLocalBackup(){
+  try{
+    localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(state));
+  }catch(e){}
+}
+function loadState(){
+  try{
+    const raw = localStorage.getItem(LOCAL_BACKUP_KEY);
+    if(!raw) return deepClone(DEFAULT_STATE);
+    const parsed = JSON.parse(raw);
+    const merged = deepClone(DEFAULT_STATE);
+    merged.config = {...merged.config, ...(parsed.config||{})};
+    merged.ui = {...merged.ui, ...(parsed.ui||{})};
+    merged.resources = Array.isArray(parsed.resources) ? parsed.resources.map(r => ({
+      id: r.id || uid('res'),
+      title: String(r.title || ''),
+      url: String(r.url || ''),
+      description: String(r.description || ''),
+      type: String(r.type || 'Enlace')
+    })) : [];
+    merged.leagues = (parsed.leagues && Array.isArray(parsed.leagues) ? parsed.leagues : merged.leagues).map((lg, idx) => ({
+      id: lg.id || merged.leagues[idx]?.id || uid('league'),
+      name: lg.name || merged.leagues[idx]?.name || `Liga ${idx+1}`,
+      subtitle: lg.subtitle || merged.leagues[idx]?.subtitle || '',
+      accent: lg.accent || merged.leagues[idx]?.accent || 'future',
+      pairs: Array.isArray(lg.pairs) ? lg.pairs.map(p => ({...p, warnings: Math.max(0, Number(p?.warnings || 0) || 0), warningNote: String(p?.warningNote || '')})) : [],
+      groups: Array.isArray(lg.groups) ? lg.groups : [],
+      matches: Array.isArray(lg.matches) ? lg.matches : [],
+      playoffMatches: Array.isArray(lg.playoffMatches) ? lg.playoffMatches : []
+    }));
+    return merged;
+  }catch(e){
+    return deepClone(DEFAULT_STATE);
+  }
+}
+function sanitizeStateForFirestore(source){
+  const clean = deepClone(source);
+  delete clean.ui;
+  return clean;
+}
+function saveState(options = {}){
+  persistLocalBackup();
+  updateHeader();
+  if(options.skipRemote) return;
+  scheduleRemoteSave();
+}
+function scheduleRemoteSave(){
+  if(!firebaseReady || !firebaseDocRef) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    try{
+      suppressRemoteEcho = true;
+      await firebaseDocRef.set({
+        state: sanitizeStateForFirestore(state),
+
+   adminKey: "padel2026Admin!", 
+
+        meta: {
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          season: state.config?.season || '',
+          title: state.config?.title || ''
+        }
+      }, {merge:true});
+    }catch(err){
+      console.error('Error al guardar en Firebase:', err);
+      toast('No se han podido sincronizar los cambios con Firebase', 'err');
+    }finally{
+      setTimeout(()=>{ suppressRemoteEcho = false; }, 1200);
+    }
+  }, 250);
+}
+function applyRemoteState(remote){
+  const normalized = normalizeImportedState(remote);
+  normalized.ui = {...state.ui};
+  state = normalized;
+  persistLocalBackup();
+  render();
+}
+function initFirebaseSync(){
+  if(!firebaseConfigured()){
+    console.warn('Firebase no configurado. La app funcionará solo con copia local.');
+    return;
+  }
+  if(!(window.firebase && firebase.apps)){
+    console.error('Firebase SDK no disponible.');
+    return;
+  }
+  try{
+    firebaseApp = firebase.apps.length ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
+    firestoreDb = firebase.firestore();
+    firebaseDocRef = firestoreDb.collection(FIREBASE_COLLECTION).doc(FIREBASE_DOCUMENT_ID);
+    firebaseReady = true;
+    firebaseUnsubscribe = firebaseDocRef.onSnapshot(async snap => {
+      if(!snap.exists){
+        try{
+          await firebaseDocRef.set({
+            state: sanitizeStateForFirestore(state),
+   
+adminKey: "padel2026Admin!", 
+
+            meta: {
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+              season: state.config?.season || '',
+              title: state.config?.title || ''
+            }
+          }, {merge:true});
+          remoteStateLoaded = true;
+        }catch(err){
+          console.error('No se pudo crear el documento inicial en Firebase:', err);
+          toast('Firebase está configurado, pero el documento no se pudo crear', 'err');
+        }
+        return;
+      }
+      const data = snap.data() || {};
+      if(data.state && !suppressRemoteEcho){
+        applyRemoteState(data.state);
+      }
+      remoteStateLoaded = true;
+    }, err => {
+      console.error('Error escuchando Firebase:', err);
+      toast('Error de sincronización con Firebase', 'err');
+    });
+  }catch(err){
+    console.error('Error inicializando Firebase:', err);
+    toast('Firebase no se ha podido iniciar. Revisa la configuración.', 'err');
+  }
+}
+
+function toast(msg, type='ok'){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast ' + type + ' show';
+  setTimeout(()=> el.classList.remove('show'), 2500);
+}
+function openModal(title, html, onOpen){
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = html;
+  document.getElementById('modalOverlay').classList.add('open');
+  modalCleanup = null;
+  if(typeof onOpen === 'function') modalCleanup = onOpen() || null;
+}
+function closeModal(){
+  document.getElementById('modalOverlay').classList.remove('open');
+  document.getElementById('modalBody').innerHTML = '';
+  if(typeof modalCleanup === 'function') modalCleanup();
+  modalCleanup = null;
+}
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if(e.target.id === 'modalOverlay') closeModal();
+});
+
+function updateHeader(){
+  document.getElementById('brandTitle').textContent = state.config.title;
+  document.getElementById('brandSeason').textContent = 'Temporada ' + state.config.season;
+  document.title = state.config.title;
+  const logoBox = document.getElementById('brandLogo');
+  logoBox.innerHTML = state.config.logo
+    ? `<img src="${state.config.logo}" alt="Logo">`
+    : `<div class="logo-fallback">🎾</div>`;
+  document.getElementById('adminChip').classList.toggle('show', isAdmin);
+  document.getElementById('adminToggleBtn').textContent = isAdmin ? 'Salir del modo administrador' : 'Acceso administrador';
+  const spectatorNote = document.getElementById('spectatorNote');
+  if(spectatorNote){
+    spectatorNote.textContent = isAdmin ? 'Pestañas con 🔒 visibles solo para administración.' : (isPublicMode() ? 'Modo espectador: acceso directo a clasificación, calendario y playoffs.' : 'Vista pública: clasificación, calendario y playoffs.');
+  }
+}
+document.getElementById('adminToggleBtn').addEventListener('click', handleAdminToggle);
+
+function handleAdminToggle(){
+  if(isAdmin){
+    isAdmin = false;
+    if(typeof logoutAdminFirebase === 'function'){
+      try{ logoutAdminFirebase(); }catch(e){}
+    }
+    if(state.ui.tab === 'admin' || state.ui.tab === 'inicio' || state.ui.tab === 'inscripciones') state.ui.tab = 'clasificacion';
+    updateHeader();
+    render();
+    return;
+  }
+
+  openModal('Acceso administrador', `
+    <div class="form-grid">
+      <div class="field c12">
+        <label>Contraseña</label>
+        <input type="password" id="adminPwdInput" placeholder="Introduce la contraseña de administrador">
+      </div>
+      <div class="c12" style="display:flex;justify-content:flex-end;gap:10px">
+        <button class="btn" onclick="closeModal()">Cancelar</button>
+        <button class="btn primary" id="adminLoginConfirm">Entrar</button>
+      </div>
+    </div>
+  `, () => {
+    const input = document.getElementById('adminPwdInput');
+    const btn = document.getElementById('adminLoginConfirm');
+    input.focus();
+    const go = () => {
+      if(input.value === state.config.adminPassword){
+        isAdmin = true;
+        state.ui.tab = 'admin';
+        closeModal();
+        updateHeader();
+        render();
+        toast('Acceso de administrador concedido');
+      }else{
+        toast('Contraseña incorrecta','err');
+      }
+    };
+    btn.addEventListener('click', go);
+    input.addEventListener('keydown', e => { if(e.key === 'Enter') go(); });
+  });
+}
+
+function getLeague(id = state.ui.selectedLeagueId){
+  return state.leagues.find(l => l.id === id) || state.leagues[0];
+}
+function setSelectedLeague(id){
+  state.ui.selectedLeagueId = id;
+  saveState();
+  render();
+}
+function hasNewsUpdates(){
+  const newsText = String((state && state.config && state.config.newsText) || '').trim();
+  const hasImage = !!((state && state.config && state.config.newsImage) || '');
+  if(hasImage) return true;
+  if(!newsText) return false;
+  const normalized = newsText.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,' ')
+    .trim();
+  return !['sin novedades','no hay novedades','sin novedad','ninguna novedad'].includes(normalized);
+}
+
+function renderTabs(){
+  const restricted = new Set(['inicio','inscripciones','admin']);
+  const publicOrder = [
+    ['normas','Normas'],
+    ['news','News'],
+    ['clasificacion','Clasificación'],
+    ['calendario','Calendario'],
+    ['playoffs','Playoffs'],
+    ['contenidos','Contenidos']
+  ];
+  const adminOrder = [
+    ['normas','Normas'],
+    ['news','News'],
+    ['inicio','Inicio'],
+    ['inscripciones','Inscripciones'],
+    ['clasificacion','Clasificación'],
+    ['calendario','Calendario'],
+    ['playoffs','Playoffs'],
+    ['contenidos','Contenidos'],
+    ['admin','Administración']
+  ];
+  const allTabs = isAdmin ? adminOrder : publicOrder;
+  const tabs = allTabs.filter(([id]) => isAdmin || !restricted.has(id));
+
+  if(!isAdmin && (restricted.has(state.ui.tab) || !tabs.some(([id]) => id === state.ui.tab))){
+    state.ui.tab = 'normas';
+  }
+
+  document.getElementById('mainTabs').innerHTML = tabs.map(([id,label]) => {
+    const adminOnly = restricted.has(id);
+    const shownLabel = isAdmin && adminOnly ? `🔒 ${label}` : label;
+    const extraClass = id === 'news'
+      ? ` news-tab${hasNewsUpdates() ? ' has-news' : ''}`
+      : '';
+    return `<button class="tab-btn ${state.ui.tab===id?'active':''}${extraClass}" data-tab="${id}" onclick="changeTab('${id}')">${shownLabel}</button>`;
+  }).join('');
+}
+function changeTab(tab){
+  state.ui.tab = tab;
+  saveState();
+  render();
+}
+
+function renderLeaguePills(){
+  return `<div class="pill-row">${
+    state.leagues.map(l => `
+      <button class="league-pill ${l.accent} ${state.ui.selectedLeagueId===l.id?'active':''}" onclick="setSelectedLeague('${l.id}')">
+        ${l.name}
+      </button>
+    `).join('')
+  }</div>`;
+}
+
+function getPairWarnings(pair){ return Math.max(0, Number(pair?.warnings || 0) || 0); }
+function getPairWarningNote(pair){ return String(pair?.warningNote || '').trim(); }
+function isPairExpelled(pair){ return getPairWarnings(pair) >= 3; }
+function pairStatusLabel(pair){
+  const warnings = getPairWarnings(pair);
+  if(warnings >= 3) return 'Expulsada';
+  if(warnings >= 1) return 'Advertida';
+  return 'Activa';
+}
+function pairStatusBadge(pair){
+  const label = pairStatusLabel(pair);
+  const cls = label === 'Expulsada' ? 'no' : label === 'Advertida' ? 'gold' : 'ok';
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+function pairWarningsBadge(pair, clickable=false){
+  const count = getPairWarnings(pair);
+  const note = getPairWarningNote(pair);
+  const attrs = clickable ? ` role="button" tabindex="0" onclick="openWarningInfo('${pair.id}')" onkeydown="handleWarningBadgeKey(event,'${pair.id}')" style="cursor:pointer"` : '';
+  return `<span class="badge ${count >= 3 ? 'no' : count > 0 ? 'gold' : 'ok'}"${attrs}>${count} Warning${count===1?'':'s'}</span>`;
+}
+function openWarningInfo(pairId){
+  const pair = state.leagues.flatMap(l => l.pairs || []).find(p => p.id === pairId);
+  if(!pair) return;
+  const note = getPairWarningNote(pair);
+  openModal('Motivo del warning', `
+    <div class="group-card">
+      <div style="font-weight:700;margin-bottom:8px">${escapeHtml(pair.j1)} / ${escapeHtml(pair.j2)}</div>
+      <div class="small-note" style="margin-bottom:12px">Warnings actuales: ${getPairWarnings(pair)}</div>
+      <div style="line-height:1.55">${note ? escapeHtml(note).replace(/\n/g,'<br>') : 'No hay observación registrada para esta pareja.'}</div>
+    </div>
+  `);
+}
+function handleWarningBadgeKey(event, pairId){
+  if(event.key === 'Enter' || event.key === ' '){
+    event.preventDefault();
+    openWarningInfo(pairId);
+  }
+}
+function canPairPlay(league, pairId){
+  const pair = league?.pairs?.find(p => p.id === pairId);
+  return !!pair && !isPairExpelled(pair);
+}
+function validateActivePair(pair){
+  if(!pair) return { ok:false, message:'La pareja seleccionada no existe.' };
+  if(isPairExpelled(pair)) return { ok:false, message:'No se puede gestionar un nuevo partido con una pareja expulsada por acumulación de 3 warnings.' };
+  return { ok:true };
+}
+
+function compareHeadToHead(league, groupId, pairAId, pairBId){
+  let pointsA = 0, pointsB = 0, diffA = 0, diffB = 0;
+  const directMatches = league.matches.filter(m =>
+    m.groupId === groupId &&
+    m.played &&
+    (
+      (m.pairAId === pairAId && m.pairBId === pairBId) ||
+      (m.pairAId === pairBId && m.pairBId === pairAId)
+    )
+  );
+
+  directMatches.forEach(m => {
+    const aIsHome = m.pairAId === pairAId;
+    const scoreA = aIsHome ? Number(m.scoreA) : Number(m.scoreB);
+    const scoreB = aIsHome ? Number(m.scoreB) : Number(m.scoreA);
+    diffA += scoreA - scoreB;
+    diffB += scoreB - scoreA;
+
+    if(scoreA > scoreB) pointsA += 3;
+    else if(scoreA < scoreB) pointsB += 3;
+    else { pointsA += 1; pointsB += 1; }
+  });
+
+  if(pointsA !== pointsB) return pointsB - pointsA;
+  if(diffA !== diffB) return diffB - diffA;
+  return 0;
+}
+
+function computeStandings(leagueId){
+  const league = getLeague(leagueId);
+  return league.groups.map(group => {
+    const rows = group.pairIds.map(pairId => {
+      const pair = league.pairs.find(p => p.id === pairId);
+      let points = 0, played = 0, scheduled = 0, pending = 0, postponed = 0, won = 0, drawn = 0, lost = 0, gf = 0, ga = 0;
+      league.matches
+        .filter(m => m.groupId === group.id && (m.pairAId === pairId || m.pairBId === pairId))
+        .forEach(m => {
+          if(m.scheduledDate || m.scheduledWeek){
+            scheduled++;
+            if(!m.played) pending++;
+          }
+          if(m.postponed) postponed++;
+          if(m.played){
+            const isA = m.pairAId === pairId;
+            const my = isA ? Number(m.scoreA) : Number(m.scoreB);
+            const opp = isA ? Number(m.scoreB) : Number(m.scoreA);
+            played++; gf += my; ga += opp;
+            if(my > opp){ points += 3; won++; }
+            else if(my === opp){ points += 1; drawn++; }
+            else { lost++; }
+          }
+        });
+      const warnings = getPairWarnings(pair);
+      const expelled = isPairExpelled(pair);
+      return { pairId, pair, points, played, scheduled, pending, postponed, won, drawn, lost, gf, ga, diff: gf-ga, warnings, warningNote: getPairWarningNote(pair), expelled };
+    }).sort((a,b)=>
+      Number(a.expelled) - Number(b.expelled) ||
+      b.points-a.points ||
+      b.diff-a.diff ||
+      compareHeadToHead(league, group.id, a.pairId, b.pairId) ||
+      b.gf-a.gf ||
+      a.pair.j1.localeCompare(b.pair.j1)
+    );
+    return { group, rows };
+  });
+}
+
+function getAllRoundRobinPairs(pairIds){
+  const out = [];
+  for(let i=0;i<pairIds.length;i++){
+    for(let j=i+1;j<pairIds.length;j++){
+      out.push([pairIds[i], pairIds[j]]);
+    }
+  }
+  return out;
+}
+function pairComboKey(a,b){ return [a,b].sort().join('|'); }
+
+function existingLegCombos(league, leg, excludeMatchId=''){
+  const set = new Set();
+  league.matches
+    .filter(m => Number(m.leg) === Number(leg) && (!excludeMatchId || m.id !== excludeMatchId))
+    .forEach(m => {
+      set.add(pairComboKey(m.pairAId, m.pairBId));
+    });
+  return set;
+}
+
+function hasDuplicateMatchInLeg(league, pairAId, pairBId, leg, excludeMatchId=''){
+  const combos = existingLegCombos(league, leg, excludeMatchId);
+  return combos.has(pairComboKey(pairAId, pairBId));
+}
+
+function getPairGroupId(league, pairId){
+  return league.pairs.find(p => p.id === pairId)?.groupId || '';
+}
+
+function validateSameGroupMatch(league, pairAId, pairBId, selectedGroupId=''){
+  const groupAId = getPairGroupId(league, pairAId);
+  const groupBId = getPairGroupId(league, pairBId);
+  if(!groupAId || !groupBId || groupAId !== groupBId){
+    return { ok:false, message:'No se puede crear ese partido: las parejas pertenecen a grupos distintos o no tienen grupo asignado. Solo se permiten partidos entre parejas del mismo grupo.' };
+  }
+  if(selectedGroupId && selectedGroupId !== groupAId){
+    return { ok:false, message:'No se puede crear ese partido: el grupo seleccionado no coincide con el grupo real de ambas parejas.' };
+  }
+  return { ok:true, groupId:groupAId };
+}
+
+function allFirstLegCompleted(league){
+  const expected = league.groups.reduce((acc,g)=> acc + ((g.pairIds.length*(g.pairIds.length-1))/2), 0);
+  const leg1 = league.matches.filter(m => Number(m.leg)===1);
+  return expected > 0 && leg1.length >= expected && leg1.every(m => m.played);
+}
+
+function generateMissingMatchesForLeg(league, leg){
+  const existing = existingLegCombos(league, leg);
+  const newMatches = [];
+  league.groups.forEach(group => {
+    const combos = getAllRoundRobinPairs(group.pairIds);
+    combos.forEach(([a,b]) => {
+      const key = pairComboKey(a,b);
+      if(existing.has(key)) return;
+      newMatches.push({
+        id: uid('match'),
+        groupId: group.id,
+        pairAId: leg === 1 ? a : b,
+        pairBId: leg === 1 ? b : a,
+        leg,
+        scheduledDate: '',
+        scheduledWeek: '',
+        played: false,
+        scoreA: '',
+        scoreB: '',
+        manual: false,
+        notes: '',
+        postponed: false
+      });
+      existing.add(key);
+    });
+  });
+  league.matches.push(...newMatches);
+  return newMatches;
+}
+
+function mondayOf(dateStr){
+  const date = new Date(dateStr + 'T12:00:00');
+  const day = date.getDay(); // 0 Sunday
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate()+diff);
+  return date;
+}
+function formatDateInput(d){
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,'0');
+  const da=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${da}`;
+}
+function formatDateEs(dateStr){
+  if(!dateStr) return 'Sin fecha';
+  const d = new Date(dateStr+'T12:00:00');
+  return d.toLocaleDateString('es-ES',{weekday:'short',day:'2-digit',month:'2-digit'});
+}
+function isoWeekLabelFromMonday(d){
+  const copy = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  copy.setUTCDate(copy.getUTCDate() + 4 - (copy.getUTCDay()||7));
+  const yearStart = new Date(Date.UTC(copy.getUTCFullYear(),0,1));
+  const week = Math.ceil((((copy - yearStart)/86400000)+1)/7);
+  return `${copy.getUTCFullYear()}-W${String(week).padStart(2,'0')}`;
+}
+
+function getScheduleDates(anchorStr, allowedDays, mode){
+  const order = ['Lunes','Martes','Miércoles','Jueves','Viernes'];
+  const selected = order.filter(day => allowedDays.includes(day));
+  if(mode === 'month'){
+    const anchor = new Date(anchorStr + 'T12:00:00');
+    const month = anchor.getMonth();
+    const dates = [];
+    const d = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate(), 12, 0, 0);
+    while(d.getMonth() === month){
+      const jsDay = d.getDay();
+      const idx = jsDay === 0 ? -1 : jsDay - 1;
+      const dayName = order[idx];
+      if(dayName && selected.includes(dayName)) dates.push({date: formatDateInput(d), dayName});
+      d.setDate(d.getDate()+1);
+    }
+    return dates;
+  }
+  const monday = mondayOf(anchorStr);
+  return selected.map(dayName => {
+    const offset = order.indexOf(dayName);
+    const d = new Date(monday);
+    d.setDate(monday.getDate()+offset);
+    return {date: formatDateInput(d), dayName};
+  });
+}
+
+function schedulePeriodForLeague(leagueId, anchorStr, allowedDays, leg, maxPerDay, mode='week'){
+  const league = getLeague(leagueId);
+  if(Number(leg) === 2 && !allFirstLegCompleted(league)){
+    throw new Error('La segunda vuelta solo puede generarse cuando toda la primera vuelta esté jugada.');
+  }
+  generateMissingMatchesForLeg(league, leg);
+
+  const blockedCombos = new Set();
+  league.matches.forEach(m => {
+    if(Number(m.leg) !== Number(leg)) return;
+    if(m.played || m.scheduledDate){
+      blockedCombos.add(pairComboKey(m.pairAId, m.pairBId));
+    }
+  });
+
+  const seenPoolCombos = new Set();
+  const pool = league.matches.filter(m => {
+    if(Number(m.leg)!==Number(leg)) return false;
+    if(m.played || m.scheduledDate) return false;
+    if(!canPairPlay(league, m.pairAId) || !canPairPlay(league, m.pairBId)) return false;
+    const combo = pairComboKey(m.pairAId, m.pairBId);
+    if(blockedCombos.has(combo)) return false;
+    if(seenPoolCombos.has(combo)) return false;
+    seenPoolCombos.add(combo);
+    return true;
+  });
+  if(pool.length === 0) return {assigned:0, skippedDates:[]};
+
+  const dates = getScheduleDates(anchorStr, allowedDays, mode);
+  const existingByDate = {};
+  league.matches.forEach(m => {
+    if(!m.scheduledDate) return;
+    existingByDate[m.scheduledDate] = (existingByDate[m.scheduledDate] || 0) + 1;
+  });
+
+  const skippedDates = dates.filter(d => (existingByDate[d.date] || 0) > 0).map(d => d.date);
+  const usableDates = dates.filter(d => !skippedDates.includes(d.date));
+  if(!usableDates.length) return {assigned:0, skippedDates};
+
+  const byGroup = {};
+  pool.forEach(m => {
+    byGroup[m.groupId] = byGroup[m.groupId] || [];
+    byGroup[m.groupId].push(m);
+  });
+  Object.values(byGroup).forEach(arr => arr.sort((a,b) => (a.createdAt||'').localeCompare(b.createdAt||'') || a.id.localeCompare(b.id)));
+
+  const historicalCounts = {};
+  const pairLegCounts = {};
+  const pairWeekCounts = {};
+  const pairRecentDate = {};
+  league.groups.forEach(g => historicalCounts[g.id] = 0);
+  league.pairs.forEach(p => {
+    pairLegCounts[p.id] = 0;
+    pairRecentDate[p.id] = '';
+  });
+  league.matches.forEach(m => {
+    if(Number(m.leg)!==Number(leg)) return;
+    if(m.groupId){
+      historicalCounts[m.groupId] = (historicalCounts[m.groupId] || 0) + ((m.played || m.scheduledDate) ? 1 : 0);
+    }
+    if(m.played || m.scheduledDate){
+      pairLegCounts[m.pairAId] = (pairLegCounts[m.pairAId] || 0) + 1;
+      pairLegCounts[m.pairBId] = (pairLegCounts[m.pairBId] || 0) + 1;
+      const week = m.scheduledWeek || (m.scheduledDate ? isoWeekLabelFromMonday(mondayOf(m.scheduledDate)) : '');
+      if(week){
+        pairWeekCounts[week] = pairWeekCounts[week] || {};
+        pairWeekCounts[week][m.pairAId] = (pairWeekCounts[week][m.pairAId] || 0) + 1;
+        pairWeekCounts[week][m.pairBId] = (pairWeekCounts[week][m.pairBId] || 0) + 1;
+      }
+      if(m.scheduledDate){
+        if(!pairRecentDate[m.pairAId] || m.scheduledDate > pairRecentDate[m.pairAId]) pairRecentDate[m.pairAId] = m.scheduledDate;
+        if(!pairRecentDate[m.pairBId] || m.scheduledDate > pairRecentDate[m.pairBId]) pairRecentDate[m.pairBId] = m.scheduledDate;
+      }
+    }
+  });
+  const assignedCounts = {};
+  league.groups.forEach(g => assignedCounts[g.id] = 0);
+
+  const assignedIds = new Set();
+  let assigned = 0;
+
+  usableDates.forEach(({date, dayName}) => {
+    const pairBooked = new Set();
+    const groupsUsedToday = new Set();
+    const weekLabel = isoWeekLabelFromMonday(mondayOf(date));
+    pairWeekCounts[weekLabel] = pairWeekCounts[weekLabel] || {};
+
+    function matchPriority(m){
+      const weekA = pairWeekCounts[weekLabel][m.pairAId] || 0;
+      const weekB = pairWeekCounts[weekLabel][m.pairBId] || 0;
+      const totalA = pairLegCounts[m.pairAId] || 0;
+      const totalB = pairLegCounts[m.pairBId] || 0;
+      const recentA = pairRecentDate[m.pairAId] || '';
+      const recentB = pairRecentDate[m.pairBId] || '';
+      const maxWeek = Math.max(weekA, weekB);
+      const sumWeek = weekA + weekB;
+      const maxTotal = Math.max(totalA, totalB);
+      const sumTotal = totalA + totalB;
+      const recency = Math.max(recentA || '', recentB || '');
+      return [maxWeek, sumWeek, maxTotal, sumTotal, recency, m.id];
+    }
+
+    function chooseMatch(avoidRepeatGroup){
+      const groupIds = Object.keys(byGroup).filter(gid => byGroup[gid].some(m => !assignedIds.has(m.id)));
+      groupIds.sort((a,b) => {
+        const cmp1 = (assignedCounts[a]||0) - (assignedCounts[b]||0);
+        if(cmp1) return cmp1;
+        const cmp2 = (historicalCounts[a]||0) - (historicalCounts[b]||0);
+        if(cmp2) return cmp2;
+        const ia = league.groups.findIndex(g=>g.id===a);
+        const ib = league.groups.findIndex(g=>g.id===b);
+        return ia - ib;
+      });
+
+      let best = null;
+      let bestScore = null;
+      for(const gid of groupIds){
+        if(avoidRepeatGroup && groupsUsedToday.has(gid)) continue;
+        const candidates = byGroup[gid].filter(m => {
+          if(assignedIds.has(m.id)) return false;
+          const pairA = league.pairs.find(p=>p.id===m.pairAId);
+          const pairB = league.pairs.find(p=>p.id===m.pairBId);
+          const unavailable = new Set([...(pairA?.unavailable||[]), ...(pairB?.unavailable||[])]);
+          return !unavailable.has(dayName) && !pairBooked.has(m.pairAId) && !pairBooked.has(m.pairBId);
+        });
+        if(!candidates.length) continue;
+        candidates.sort((m1,m2) => {
+          const p1 = matchPriority(m1);
+          const p2 = matchPriority(m2);
+          for(let i=0;i<p1.length;i++){
+            if(p1[i] < p2[i]) return -1;
+            if(p1[i] > p2[i]) return 1;
+          }
+          return 0;
+        });
+        const candidate = candidates[0];
+        const score = matchPriority(candidate);
+        if(!best){
+          best = candidate;
+          bestScore = score;
+          continue;
+        }
+        for(let i=0;i<score.length;i++){
+          if(score[i] < bestScore[i]){
+            best = candidate;
+            bestScore = score;
+            break;
+          }
+          if(score[i] > bestScore[i]) break;
+        }
+      }
+      return best;
+    }
+
+    for(let slot=0; slot<maxPerDay; slot++){
+      let match = chooseMatch(true);
+      if(!match) match = chooseMatch(false);
+      if(!match) break;
+      match.scheduledDate = date;
+      match.scheduledWeek = weekLabel;
+      assignedIds.add(match.id);
+      pairBooked.add(match.pairAId);
+      pairBooked.add(match.pairBId);
+      groupsUsedToday.add(match.groupId);
+      assignedCounts[match.groupId] = (assignedCounts[match.groupId] || 0) + 1;
+      pairLegCounts[match.pairAId] = (pairLegCounts[match.pairAId] || 0) + 1;
+      pairLegCounts[match.pairBId] = (pairLegCounts[match.pairBId] || 0) + 1;
+      pairWeekCounts[weekLabel][match.pairAId] = (pairWeekCounts[weekLabel][match.pairAId] || 0) + 1;
+      pairWeekCounts[weekLabel][match.pairBId] = (pairWeekCounts[weekLabel][match.pairBId] || 0) + 1;
+      pairRecentDate[match.pairAId] = date;
+      pairRecentDate[match.pairBId] = date;
+      assigned++;
+    }
+  });
+
+  return {assigned, skippedDates};
+}
+
+
+function makeBackupFileName(ext){
+  const season = (state.config.season || 'temporada').replace(/[^\w\-]+/g,'_');
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const stamp = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+  return `liga_padel_escolar_${season}_${stamp}.${ext}`;
+}
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1500);
+}
+function parseBool(value){
+  if(typeof value === 'boolean') return value;
+  const v = String(value || '').trim().toLowerCase();
+  return ['si','sí','true','1','yes','x'].includes(v);
+}
+function normalizeImportedState(imported){
+  validateImportedState(imported);
+  const merged = deepClone(DEFAULT_STATE);
+  merged.config = Object.assign({}, merged.config, imported.config || {});
+  merged.ui = Object.assign({}, merged.ui, imported.ui || {});
+  merged.resources = Array.isArray(imported.resources) ? imported.resources.map(resource => ({
+    id: resource.id || uid('res'),
+    title: String(resource.title || ''),
+    url: String(resource.url || ''),
+    description: String(resource.description || ''),
+    type: String(resource.type || 'Enlace')
+  })) : [];
+  merged.leagues = Array.isArray(imported.leagues) ? imported.leagues.map((league, idx) => {
+    const base = deepClone(DEFAULT_STATE.leagues[idx] || {
+      id: uid('league'),
+      name: 'Liga',
+      subtitle: '',
+      accent: idx === 0 ? 'future' : 'pro',
+      pairs: [],
+      groups: [],
+      matches: [],
+      playoffMatches: []
+    });
+    const normalized = Object.assign(base, league || {});
+    normalized.pairs = Array.isArray(normalized.pairs) ? normalized.pairs.map(pair => ({
+      id: pair.id || uid('pair'),
+      j1: pair.j1 || '',
+      j2: pair.j2 || '',
+      reserve: pair.reserve || '',
+      course1: pair.course1 || '',
+      course2: pair.course2 || '',
+      level1: pair.level1 || '',
+      level2: pair.level2 || '',
+      paid: !!pair.paid,
+      unavailable: Array.isArray(pair.unavailable) ? pair.unavailable : String(pair.unavailable || '').split('|').filter(Boolean),
+      groupId: pair.groupId || null,
+      warnings: Math.max(0, Number(pair.warnings || 0) || 0),
+      warningNote: pair.warningNote || ''
+    })) : [];
+    normalized.groups = Array.isArray(normalized.groups) ? normalized.groups.map(group => ({
+      id: group.id || uid('group'),
+      name: group.name || '',
+      pairIds: Array.isArray(group.pairIds) ? group.pairIds.filter(Boolean) : String(group.pairIds || '').split('|').filter(Boolean)
+    })) : [];
+    normalized.matches = Array.isArray(normalized.matches) ? normalized.matches.map(match => ({
+      id: match.id || uid('match'),
+      groupId: match.groupId || null,
+      leg: Number(match.leg || 1),
+      pairAId: match.pairAId || null,
+      pairBId: match.pairBId || null,
+      scheduledDate: match.scheduledDate || '',
+      scheduledWeek: match.scheduledWeek || '',
+      played: !!match.played,
+      scoreA: match.scoreA === '' || match.scoreA === null || match.scoreA === undefined ? null : Number(match.scoreA),
+      scoreB: match.scoreB === '' || match.scoreB === null || match.scoreB === undefined ? null : Number(match.scoreB),
+      manual: !!match.manual,
+      notes: match.notes || '',
+      postponed: !!match.postponed
+    })) : [];
+    normalized.playoffMatches = Array.isArray(normalized.playoffMatches) ? normalized.playoffMatches : [];
+    return normalized;
+  }) : deepClone(DEFAULT_STATE.leagues);
+  return merged;
+}
+function exportJSON(){
+  const payload = {
+    meta: {
+      app: 'Liga de Pádel Escolar',
+      version: 'v38-news-con-imagen-estable',
+      exportedAt: new Date().toISOString(),
+      note: 'Copia de seguridad completa para exportar e importar. Compatible con la versión Firebase en tiempo real.'
+    },
+    state
+  };
+  const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json;charset=utf-8'});
+  downloadBlob(blob, makeBackupFileName('json'));
+  toast('Copia JSON descargada correctamente');
+}
+function csvCell(value){
+  const str = String(value ?? '');
+  return '"' + str.replace(/"/g, '""').replace(/\r?\n/g, ' ') + '"';
+}
+function csvRow(values){
+  return values.map(csvCell).join(',');
+}
+function exportExcel(){
+  try{
+    if(!window.XLSX){
+      toast('No se ha cargado la librería de Excel. Recarga la página e inténtalo de nuevo.', 'err');
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+    const safeSheetName = name => String(name || 'Hoja').replace(/[\/*?:\[\]]/g, ' ').slice(0,31);
+
+    const resumen = [
+      [state.config.title || 'Liga de Pádel Escolar', '', '', '', '', ''],
+      ['Temporada', state.config.season || '', '', '', '', ''],
+      ['Exportado', new Date().toLocaleString('es-ES'), '', '', '', ''],
+      [],
+      ['Liga', 'Parejas', 'Activas', 'Expulsadas', 'Partidos jugados', 'Partidos aplazados']
+    ];
+    state.leagues.forEach(l => {
+      const activas = (l.pairs || []).filter(p => !isPairExpelled(p)).length;
+      const expulsadas = (l.pairs || []).filter(p => isPairExpelled(p)).length;
+      const jugados = (l.matches || []).filter(m => m.played).length;
+      const aplazados = (l.matches || []).filter(m => m.postponed).length;
+      resumen.push([l.name, l.pairs.length, activas, expulsadas, jugados, aplazados]);
+    });
+    const wsResumen = XLSX.utils.aoa_to_sheet(resumen);
+    wsResumen['!cols'] = [{wch:28},{wch:14},{wch:12},{wch:14},{wch:18},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen');
+
+    state.leagues.forEach(league => {
+      const standings = computeStandings(league.id);
+      const clasifRows = [
+        [`Clasificación - ${league.name}`],
+        ['Grupo','Pos','Pareja','Warnings','Motivo warning','Estado','Prog','Pendientes','Aplazados','PJ','G','E','P','JF','JC','Dif','Pts']
+      ];
+      standings.forEach(({group, rows}) => {
+        if(!rows.length){
+          clasifRows.push([group.name || 'Sin nombre', '', 'Sin parejas', '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+          return;
+        }
+        rows.forEach((r, idx) => {
+          clasifRows.push([
+            group.name || 'Sin nombre',
+            idx + 1,
+            `${r.pair.j1} / ${r.pair.j2}`,
+            getPairWarnings(r.pair),
+            getPairWarningNote(r.pair),
+            pairStatusLabel(r.pair),
+            r.scheduled,
+            r.pending,
+            r.postponed || 0,
+            r.played,
+            r.won,
+            r.drawn,
+            r.lost,
+            r.gf,
+            r.ga,
+            r.diff,
+            r.points
+          ]);
+        });
+      });
+      const wsClasif = XLSX.utils.aoa_to_sheet(clasifRows);
+      wsClasif['!cols'] = [{wch:18},{wch:6},{wch:32},{wch:10},{wch:28},{wch:12},{wch:8},{wch:12},{wch:11},{wch:6},{wch:6},{wch:6},{wch:6},{wch:6},{wch:6},{wch:8},{wch:8}];
+      XLSX.utils.book_append_sheet(wb, wsClasif, safeSheetName(`Clasif ${league.name}`));
+
+      const pairsRows = [
+        [`Parejas - ${league.name}`],
+        ['Pareja','Reserva','Curso J1','Curso J2','Nivel J1','Nivel J2','Pago','Warnings','Motivo warning','Estado','Grupo','No pueden jugar']
+      ];
+      if(!(league.pairs || []).length){
+        pairsRows.push(['No hay parejas','','','','','','','','','','','']);
+      } else {
+        league.pairs.forEach(p => {
+          const group = league.groups.find(g => g.id === p.groupId);
+          pairsRows.push([
+            `${p.j1} / ${p.j2}`,
+            p.reserve || '',
+            p.course1 || '',
+            p.course2 || '',
+            p.level1 || '',
+            p.level2 || '',
+            p.paid ? 'Pagado' : 'Pendiente',
+            getPairWarnings(p),
+            getPairWarningNote(p),
+            pairStatusLabel(p),
+            group?.name || '',
+            Array.isArray(p.unavailable) ? p.unavailable.join(', ') : ''
+          ]);
+        });
+      }
+      const wsPairs = XLSX.utils.aoa_to_sheet(pairsRows);
+      wsPairs['!cols'] = [{wch:32},{wch:18},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:10},{wch:32},{wch:12},{wch:18},{wch:24}];
+      XLSX.utils.book_append_sheet(wb, wsPairs, safeSheetName(`Parejas ${league.name}`));
+
+      const scheduledMatches = [...(league.matches || [])]
+        .filter(m => m.scheduledDate)
+        .sort((a,b) => (a.scheduledDate || '').localeCompare(b.scheduledDate || '') || (a.scheduledWeek || '').localeCompare(b.scheduledWeek || ''));
+      const calendarRows = [
+        [`Calendario programado - ${league.name}`],
+        ['Fecha','Semana','Grupo','Vuelta','Pareja A','Warnings A','Estado A','Pareja B','Warnings B','Estado B','Estado partido','Aplazado','Resultado','Notas']
+      ];
+      if(!scheduledMatches.length){
+        calendarRows.push(['','','','','No hay partidos programados','','','','','','','','','']);
+      } else {
+        scheduledMatches.forEach(m => {
+          const pairA = league.pairs.find(p => p.id === m.pairAId);
+          const pairB = league.pairs.find(p => p.id === m.pairBId);
+          const group = league.groups.find(g => g.id === m.groupId);
+          calendarRows.push([
+            m.scheduledDate ? formatDateEs(m.scheduledDate) : '',
+            m.scheduledWeek || '',
+            group?.name || 'Sin grupo',
+            Number(m.leg) === 2 ? '2ª vuelta' : '1ª vuelta',
+            pairA ? `${pairA.j1} / ${pairA.j2}` : '—',
+            pairA ? getPairWarnings(pairA) : '',
+            pairA ? pairStatusLabel(pairA) : '',
+            pairB ? `${pairB.j1} / ${pairB.j2}` : '—',
+            pairB ? getPairWarnings(pairB) : '',
+            pairB ? pairStatusLabel(pairB) : '',
+            m.played ? 'Jugado' : 'Pendiente',
+            m.postponed ? 'Sí' : 'No',
+            m.played ? `${m.scoreA ?? ''}-${m.scoreB ?? ''}` : '',
+            m.notes || ''
+          ]);
+        });
+      }
+      const wsCalend = XLSX.utils.aoa_to_sheet(calendarRows);
+      wsCalend['!cols'] = [{wch:14},{wch:18},{wch:18},{wch:12},{wch:28},{wch:10},{wch:12},{wch:28},{wch:10},{wch:12},{wch:14},{wch:12},{wch:12},{wch:36}];
+      XLSX.utils.book_append_sheet(wb, wsCalend, safeSheetName(`Calend ${league.name}`));
+
+      const postponedMatches = [...(league.matches || [])]
+        .filter(m => m.postponed)
+        .sort((a,b) => (a.scheduledDate || '9999-99-99').localeCompare(b.scheduledDate || '9999-99-99') || (a.scheduledWeek || '').localeCompare(b.scheduledWeek || ''));
+      const postponedRows = [
+        [`Partidos aplazados - ${league.name}`],
+        ['Fecha','Semana','Grupo','Vuelta','Pareja A','Warnings A','Pareja B','Warnings B','Estado','Resultado','Observaciones']
+      ];
+      if(!postponedMatches.length){
+        postponedRows.push(['','','','','No hay partidos aplazados','','','','','','']);
+      } else {
+        postponedMatches.forEach(m => {
+          const pairA = league.pairs.find(p => p.id === m.pairAId);
+          const pairB = league.pairs.find(p => p.id === m.pairBId);
+          const group = league.groups.find(g => g.id === m.groupId);
+          postponedRows.push([
+            m.scheduledDate ? formatDateEs(m.scheduledDate) : '',
+            m.scheduledWeek || '',
+            group?.name || 'Sin grupo',
+            Number(m.leg) === 2 ? '2ª vuelta' : '1ª vuelta',
+            pairA ? `${pairA.j1} / ${pairA.j2}` : '—',
+            pairA ? getPairWarnings(pairA) : '',
+            pairB ? `${pairB.j1} / ${pairB.j2}` : '—',
+            pairB ? getPairWarnings(pairB) : '',
+            m.played ? 'Jugado' : 'Pendiente',
+            m.played ? `${m.scoreA ?? ''}-${m.scoreB ?? ''}` : '',
+            m.notes || ''
+          ]);
+        });
+      }
+      const wsPostponed = XLSX.utils.aoa_to_sheet(postponedRows);
+      wsPostponed['!cols'] = [{wch:14},{wch:18},{wch:18},{wch:12},{wch:28},{wch:10},{wch:28},{wch:10},{wch:12},{wch:12},{wch:40}];
+      XLSX.utils.book_append_sheet(wb, wsPostponed, safeSheetName(`Aplaz ${league.name}`));
+    });
+
+
+    const wsNormas = XLSX.utils.aoa_to_sheet([
+      ['Normas'],
+      ['Hay imagen subida', state.config.normsImage ? 'Sí' : 'No'],
+      ['Nota', state.config.normsImage ? 'La imagen de normas está guardada en el JSON para restauración completa.' : 'No hay imagen de normas subida.']
+    ]);
+    wsNormas['!cols'] = [{wch:22},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, wsNormas, 'Normas');
+
+    const resourcesRows = [['Contenidos'], ['Título','Tipo','Enlace','Descripción']];
+    if((state.resources || []).length){
+      state.resources.forEach(r => resourcesRows.push([r.title || '', r.type || '', r.url || '', r.description || '']));
+    }else{
+      resourcesRows.push(['No hay contenidos','','','']);
+    }
+    const wsResources = XLSX.utils.aoa_to_sheet(resourcesRows);
+    wsResources['!cols'] = [{wch:28},{wch:18},{wch:48},{wch:42}];
+    XLSX.utils.book_append_sheet(wb, wsResources, 'Contenidos');
+
+
+
+    const newsRows = [
+      ['News'],
+      ['Contenido publicado'],
+      [state.config.newsText || 'Sin novedades']
+    ];
+    const wsNews = XLSX.utils.aoa_to_sheet(newsRows);
+    wsNews['!cols'] = [{wch:120}];
+    XLSX.utils.book_append_sheet(wb, wsNews, 'News');
+
+    XLSX.writeFile(wb, makeBackupFileName('xlsx'));
+    toast('Excel descargado correctamente');
+  }catch(err){
+    toast('Error al exportar Excel: ' + err.message, 'err');
+  }
+}
+
+async function syncStateToFirebaseNow(){
+  if(!firebaseReady || !firebaseDocRef) return;
+  suppressRemoteEcho = true;
+  try{
+    await firebaseDocRef.set({
+      state: sanitizeStateForFirestore(state),
+      adminKey: "padel2026Admin!",
+      meta: {
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        season: state.config?.season || '',
+        title: state.config?.title || ''
+      }
+    }, {merge:true});
+  }finally{
+    setTimeout(()=>{ suppressRemoteEcho = false; }, 1500);
+  }
+}
+function importJSONFile(file){
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try{
+      const imported = JSON.parse(e.target.result);
+      const sourceState = imported && imported.state ? imported.state : imported;
+      const normalized = normalizeImportedState(sourceState);
+      normalized.ui = {...state.ui};
+      state = normalized;
+      isAdmin = false;
+      persistLocalBackup();
+      render();
+      await syncStateToFirebaseNow();
+      toast('Datos JSON importados correctamente');
+    }catch(err){
+      console.error('Error al importar JSON:', err);
+      toast('Error al importar JSON: '+err.message, 'err');
+    }
+  };
+  reader.readAsText(file);
+}
+function importExcelFile(file){
+  toast('La importación desde Excel no está disponible en esta versión. Usa el JSON como copia de restauración.', 'err');
+}
+function validateImportedState(obj){
+  if(!obj || typeof obj !== 'object') throw new Error('Formato inválido.');
+  if(!obj.config || !Array.isArray(obj.leagues)) throw new Error('Faltan bloques básicos del backup.');
+  obj.leagues.forEach((l, idx)=>{
+    if(!l || typeof l !== 'object') throw new Error(`Liga ${idx+1} inválida.`);
+    if(!Array.isArray(l.pairs) || !Array.isArray(l.groups) || !Array.isArray(l.matches)) throw new Error(`La liga "${l.name || idx+1}" tiene una estructura inválida.`);
+  });
+}
+function render(){
+  renderTabs();
+  const view = document.getElementById('view');
+  const tab = state.ui.tab;
+  if(tab === 'inicio') view.innerHTML = renderHome();
+  if(tab === 'inscripciones') view.innerHTML = renderRegistrations();
+  if(tab === 'clasificacion') view.innerHTML = renderStandings();
+  if(tab === 'calendario') view.innerHTML = renderCalendar();
+  if(tab === 'playoffs') view.innerHTML = renderPlayoffs();
+  if(tab === 'normas') view.innerHTML = renderNorms();
+  if(tab === 'contenidos') view.innerHTML = renderContents();
+  if(tab === 'news') view.innerHTML = renderNews();
+  if(tab === 'admin') view.innerHTML = isAdmin ? renderAdmin() : renderHome();
+  attachDynamicEvents();
+  if(document.getElementById('p_league')) updateAddPairGroupOptions();
+  updateHeader();
+}
+function attachDynamicEvents(){
+  document.querySelectorAll('[data-upload-logo]').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        state.config.logo = ev.target.result;
+        saveState();
+        render();
+        toast('Logo actualizado');
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+  document.querySelectorAll('[data-upload-norms]').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        state.config.normsImage = ev.target.result;
+        saveState();
+        render();
+        toast('Imagen de normas actualizada');
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+  document.querySelectorAll('[data-import-json]').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const f = e.target.files[0];
+      if(f) importJSONFile(f);
+      e.target.value = '';
+    });
+  });
+  document.querySelectorAll('[data-import-excel]').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const f = e.target.files[0];
+      if(f) importExcelFile(f);
+      e.target.value = '';
+    });
+  });
+  document.querySelectorAll('[data-upload-news-image]').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        state.config.newsImage = ev.target.result;
+        saveState();
+        render();
+        toast('Imagen de News actualizada');
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    });
+  });
+}
+
+function renderHome(){
+  const league = getLeague();
+  const matchesPlayed = league.matches.filter(m=>m.played).length;
+  const scheduled = league.matches.filter(m=>m.scheduledDate).length;
+  return `
+    <div class="hero">
+      <div class="card hero-box">
+        ${renderLeaguePills()}
+        <div class="callout" style="margin-top:14px">
+          <div class="badge ${league.accent==='future'?'gold':'blue'}" style="margin-bottom:10px">${league.name}</div>
+          <h2 style="margin:0 0 8px">${league.subtitle}</h2>
+          <p class="muted" style="margin:0 0 16px">Web de gestión para registrar parejas, grupos, calendario, resultados y clasificación de la competición escolar.</p>
+          <div class="stats">
+            <div class="stat"><small>Parejas</small><strong>${league.pairs.length}</strong></div>
+            <div class="stat"><small>Grupos</small><strong>${league.groups.length}</strong></div>
+            <div class="stat"><small>Partidos jugados</small><strong>${matchesPlayed}</strong></div>
+            <div class="stat"><small>Programados</small><strong>${scheduled}</strong></div>
+          </div>
+        </div>
+      </div>
+      <div class="card hero-box">
+        <div class="card-title"><h3>Resumen rápido</h3></div>
+        <p class="small-note">Solo el administrador puede modificar datos, generar partidos, introducir resultados o cambiar la configuración general.</p>
+        <div class="grid" style="margin-top:14px">
+          <div class="group-card">
+            <strong>🔐 Administración</strong>
+            <p class="small-note">Inscripción de parejas, grupos, calendario automático, partidos manuales y exportación/importación.</p>
+          </div>
+          <div class="group-card">
+            <strong>🏅 Clasificación</strong>
+            <p class="small-note">3 puntos victoria, 1 empate, 0 derrota. Desempate por diferencia de juegos.</p>
+          </div>
+          <div class="group-card">
+            <strong>📅 Calendario</strong>
+            <p class="small-note">Generación automática semanal o mensual, con selección de días de juego, control de no repetición y rotación equilibrada entre grupos.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="card-title"><h3>Últimos partidos programados</h3></div>
+      ${renderPublicMatches(league)}
+    </div>
+  `;
+}
+
+function renderPublicMatches(league){
+  const items = [...league.matches]
+    .filter(m=>m.scheduledDate || m.played)
+    .sort((a,b)=>(a.scheduledDate||'9999').localeCompare(b.scheduledDate||'9999'))
+    .slice(0,10);
+
+  if(!items.length) return `<div class="empty">Todavía no hay partidos programados.</div>`;
+  return items.map(m=>{
+    const a = league.pairs.find(p=>p.id===m.pairAId);
+    const b = league.pairs.find(p=>p.id===m.pairBId);
+    const g = league.groups.find(x=>x.id===m.groupId);
+    return `<div class="match-item">
+      <span class="badge violet">${g?.name || 'Sin grupo'}</span>
+      <div class="match-pair-block"><div class="pair-name">${a?.j1 || '?'} / ${a?.j2 || '?'}</div></div>
+      <span class="match-vs">VS</span>
+      <div class="match-pair-block"><div class="pair-sub">${b?.j1 || '?'} / ${b?.j2 || '?'}</div></div>
+      <span class="badge blue">${m.scheduledDate ? formatDateEs(m.scheduledDate) : 'Sin fecha'}</span>
+      ${m.played ? `<div class="score">${m.scoreA}–${m.scoreB}</div>` : `<span class="badge">Pendiente</span>`}
+      ${m.postponed ? `<span class="badge gold">Aplazado</span>` : ``}
+      <span class="badge ${Number(m.leg)===1?'gold':'blue'}">${Number(m.leg)===1?'1ª vuelta':'2ª vuelta'}</span>
+      ${m.notes ? `<div class="match-note"><strong>Observación:</strong> ${escapeHtml(m.notes)}</div>` : ``}
+    </div>`;
+  }).join('');
+}
+
+function renderRegistrations(){
+  const league = getLeague();
+  return `
+    <div class="card">
+      ${renderLeaguePills()}
+      <div class="card-title" style="margin-top:14px"><h3>Inscripciones de ${league.name}</h3></div>
+      <div class="stats">
+        <div class="stat"><small>Parejas</small><strong>${league.pairs.length}</strong></div>
+        <div class="stat"><small>Pagadas</small><strong>${league.pairs.filter(p=>p.paid).length}</strong></div>
+        <div class="stat"><small>Pendientes</small><strong>${league.pairs.filter(p=>!p.paid).length}</strong></div>
+        <div class="stat"><small>Con grupo</small><strong>${league.pairs.filter(p=>p.groupId).length}</strong></div>
+      </div>
+      <div class="table-wrap" style="margin-top:14px">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>Pareja</th><th>Reserva</th><th>Curso/Nivel</th><th>Pago</th><th>Warnings</th><th>Motivo</th><th>Estado</th><th>No pueden</th><th>Grupo</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${league.pairs.length ? league.pairs.map((p,i)=>{
+              const g = league.groups.find(x=>x.id===p.groupId);
+              return `<tr>
+                <td>${i+1}</td>
+                <td><div class="pair-stack"><span class="pair-line">${p.j1}</span><span class="pair-line">${p.j2}</span></div></td>
+                <td>${p.reserve || '—'}</td>
+                <td>
+                  <div>${p.course1 || '—'} · ${p.level1 || '—'}</div>
+                  <div class="muted">${p.course2 || '—'} · ${p.level2 || '—'}</div>
+                </td>
+                <td><span class="badge ${p.paid?'ok':'no'}">${p.paid?'Pagado':'Pendiente'}</span></td>
+                <td>${pairWarningsBadge(p, true)}</td>
+                <td>${escapeHtml(getPairWarningNote(p) || '—')}</td>
+                <td>${pairStatusBadge(p)}</td>
+                <td>${(p.unavailable||[]).length ? p.unavailable.map(d=>`<span class="badge">${d}</span>`).join(' ') : '—'}</td>
+                <td>${g ? `<span class="badge ${league.accent==='future'?'gold':'blue'}">${g.name}</span>` : '—'}</td>
+              </tr>`;
+            }).join('') : `<tr><td colspan="10"><div class="empty">No hay parejas inscritas todavía.</div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function renderStandings(){
+  const league = getLeague();
+  const standings = computeStandings(league.id);
+  return `
+    <div class="card">
+      ${renderLeaguePills()}
+      <div class="card-title" style="margin-top:14px"><h3>Clasificación · ${league.name}</h3></div>
+      ${league.groups.length ? standings.map(({group,rows})=>`
+        <div class="group-card" style="margin-bottom:12px">
+          <div class="group-head">
+            <span style="font-size:16px;font-weight:600">${group.name}</span>
+            <span class="small-note">${rows.length} parejas</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Pos</th><th>Pareja</th><th>Warning</th>${isAdmin ? '<th>Estado</th><th>Prog</th><th>Pendientes</th><th>Aplazados</th>' : ''}<th>PJ</th><th>G</th><th>E</th><th>P</th><th>JF</th><th>JC</th><th class="col-dif">Dif</th><th class="col-pts">Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows.length ? rows.map((r,idx)=>`
+                  <tr>
+                    <td>${idx===0?'<span class="pos-badge top1">🥇 1</span>':idx===1?'<span class="pos-badge top2">🥈 2</span>':idx===2?'<span class="pos-badge top3">🥉 3</span>':`<span class="pos-badge">${idx+1}</span>`}</td>
+                    <td><div class="pair-stack"><span class="pair-line">${r.pair.j1}</span><span class="pair-line">${r.pair.j2}</span></div></td>
+                    <td>${pairWarningsBadge(r.pair, true)}</td>
+                    ${isAdmin ? `<td>${pairStatusBadge(r.pair)}</td><td>${r.scheduled}</td><td>${r.pending}</td><td>${r.postponed}</td>` : ''}<td>${r.played}</td><td>${r.won}</td><td>${r.drawn}</td><td>${r.lost}</td>
+                    <td>${r.gf}</td><td>${r.ga}</td><td class="col-dif">${r.diff>0?'+':''}${r.diff}</td><td class="col-pts"><strong>${r.points}</strong></td>
+                  </tr>
+                `).join('') : `<tr><td colspan="${isAdmin ? 16 : 13}">Sin parejas en este grupo.</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `).join('') : `<div class="empty">Aún no hay grupos creados.</div>`}
+      <p class="small-note">Criterio de clasificación: primero puntos (3 victoria, 1 empate, 0 derrota) y después diferencia de juegos. Además, 3 warnings implican la expulsión de la liga.</p>
+    </div>
+  `;
+}
+
+function renderCalendar(){
+  const league = getLeague();
+  const grouped = {};
+  [...league.matches].sort((a,b)=>(a.scheduledDate||'9999').localeCompare(b.scheduledDate||'9999')).forEach(m=>{
+    const key = m.scheduledWeek || 'Sin semana';
+    grouped[key] = grouped[key] || [];
+    grouped[key].push(m);
+  });
+  return `
+    <div class="card">
+      ${renderLeaguePills()}
+      <div class="card-title" style="margin-top:14px">
+        <h3>Calendario · ${league.name}</h3>
+        ${isAdmin ? `<button class="btn primary" onclick="openScheduleModal()">Generar calendario</button>` : ``}
+      </div>
+      ${Object.keys(grouped).length ? Object.entries(grouped).map(([week,matches])=>`
+        <div class="group-card" style="margin-bottom:12px">
+          <div class="group-head">
+            <strong>${week}</strong>
+            <span class="small-note">${matches.length} partido(s)</span>
+          </div>
+          ${matches.map(m=>{
+            const a = league.pairs.find(p=>p.id===m.pairAId);
+            const b = league.pairs.find(p=>p.id===m.pairBId);
+            const g = league.groups.find(x=>x.id===m.groupId);
+            return `<div class="match-item">
+              <span class="badge ${league.accent==='future'?'gold':'blue'}">${g?.name || 'Sin grupo'}</span>
+              <div class="match-pair-block"><div class="pair-name">${a?.j1 || '?'} / ${a?.j2 || '?'}</div></div>
+              <span class="match-vs">VS</span>
+              <div class="match-pair-block"><div class="pair-sub">${b?.j1 || '?'} / ${b?.j2 || '?'}</div></div>
+              <span class="badge blue">${m.scheduledDate ? formatDateEs(m.scheduledDate) : 'Sin fecha'}</span>
+              <span class="badge ${Number(m.leg)===1?'gold':'blue'}">${Number(m.leg)===1?'1ª vuelta':'2ª vuelta'}</span>
+              ${m.played ? `<div class="score">${m.scoreA}–${m.scoreB}</div>` : `<span class="badge">Pendiente</span>`}
+              ${m.postponed ? `<span class="badge gold">Aplazado</span>` : ``}
+              ${m.notes ? `<div class="match-note muted-note"><strong>Observación:</strong> ${escapeHtml(m.notes)}</div>` : ``}
+            </div>`;
+          }).join('')}
+        </div>
+      `).join('') : `<div class="empty">No hay partidos programados todavía.</div>`}
+    </div>
+  `;
+}
+
+
+function renderNorms(){
+  return `
+    <div class="card" style="padding:${state.config.normsImage ? '12px' : '18px'}">
+      <div class="card-title" style="margin-bottom:${state.config.normsImage ? '12px' : '0'}">
+        <div>
+          <h3 style="margin-bottom:6px">Reglas / Normas</h3>
+          <div class="small-note">Pantalla principal recomendada para proyectar o consultar antes de jugar.</div>
+        </div>
+        ${isAdmin ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
+          <label class="btn primary">Subir imagen<input type="file" accept="image/*" class="hidden" data-upload-norms></label>
+          ${state.config.normsImage ? `<button class="btn bad" onclick="removeNormsImage()">Quitar imagen</button>` : ``}
+        </div>` : ``}
+      </div>
+      ${state.config.normsImage ? `
+        <div style="position:relative;min-height:calc(100vh - 240px);border-radius:22px;overflow:hidden;border:1px solid var(--line2);background:
+          radial-gradient(circle at top left, rgba(255,191,60,.12), transparent 24%),
+          radial-gradient(circle at top right, rgba(100,167,255,.14), transparent 24%),
+          #09101d;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;padding:18px">
+          <img src="${state.config.normsImage}" alt="Normas de la liga" style="display:block;width:100%;height:100%;max-height:calc(100vh - 276px);object-fit:contain;border-radius:16px;background:#0a1020">
+          <div style="position:absolute;left:18px;right:18px;bottom:18px;display:flex;justify-content:space-between;gap:10px;align-items:flex-end;flex-wrap:wrap">
+            <div style="padding:12px 14px;border-radius:16px;background:rgba(9,16,29,.72);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12)">
+              <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Pantalla de normas</div>
+              <div style="font-size:clamp(20px,2.4vw,32px);font-weight:800;line-height:1.1">${escapeHtml(state.config.title || 'Liga de Pádel Escolar')}</div>
+            </div>
+            <div style="padding:10px 12px;border-radius:14px;background:rgba(9,16,29,.72);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12)" class="small-note">
+              ${escapeHtml(state.config.season || '')}
+            </div>
+          </div>
+        </div>
+      ` : `
+        <div class="empty" style="min-height:50vh;display:grid;place-items:center;border:1px dashed var(--line2);border-radius:22px">
+          <div>
+            <div style="font-size:42px;text-align:center;margin-bottom:10px">📋</div>
+            <div>Todavía no hay imagen de normas subida.${isAdmin ? ' Súbela desde aquí para que todo el alumnado pueda verla nada más entrar.' : ''}</div>
+          </div>
+        </div>
+      `}
+    </div>
+  `;
+}
+function removeNormsImage(){
+  state.config.normsImage = null;
+  saveState();
+  render();
+  toast('Imagen de normas eliminada');
+}
+
+function renderContents(){
+  return `
+    <div class="card">
+      <div class="card-title">
+        <h3>Contenidos interesantes</h3>
+        ${isAdmin ? `<button class="btn primary" onclick="openAddResourceModal()">Añadir contenido</button>` : ``}
+      </div>
+      <p class="small-note">Aquí puedes reunir vídeos, fotos, técnicas de golpeo, ubicación en pista y enlaces relacionados con el pádel o con la propia liga.</p>
+      <div class="grid" style="margin-top:14px">
+        ${state.resources.length ? state.resources.map((resource, index) => `
+          <div class="group-card">
+            <div class="group-head">
+              <strong>${escapeHtml(resource.title || 'Contenido')}</strong>
+              <span class="badge blue">${escapeHtml(resource.type || 'Enlace')}</span>
+            </div>
+            ${resource.description ? `<div class="small-note" style="margin-bottom:10px;color:var(--txt)">${escapeHtml(resource.description)}</div>` : ``}
+            <div class="resource-actions">
+              <a class="btn" href="${escapeHtml(resource.url)}" target="_blank" rel="noopener noreferrer">Abrir enlace</a>
+              ${isAdmin ? `
+                <button class="btn small" onclick="openAddResourceModal('${resource.id}')">Editar</button>
+                <button class="btn small" onclick="moveResource('${resource.id}', -1)" ${index===0?'disabled':''}>↑ Subir</button>
+                <button class="btn small" onclick="moveResource('${resource.id}', 1)" ${index===state.resources.length-1?'disabled':''}>↓ Bajar</button>
+                <button class="btn bad small" onclick="deleteResource('${resource.id}')">Borrar</button>
+              ` : ``}
+            </div>
+          </div>
+        `).join('') : `<div class="empty">Todavía no hay contenidos añadidos.</div>`}
+      </div>
+      ${isAdmin && state.resources.length ? `<p class="small-note" style="margin-top:14px">Usa los botones de subir y bajar para decidir el orden en que los espectadores verán los contenidos.</p>` : ``}
+    </div>
+  `;
+}
+function openAddResourceModal(resourceId=''){
+  const resource = resourceId ? (state.resources || []).find(r => r.id === resourceId) : null;
+  openModal(resource ? 'Editar contenido' : 'Añadir contenido', `
+    <div class="form-grid">
+      <div class="field c6"><label>Título</label><input id="res_title" value="${escapeHtml(resource?.title || '')}" placeholder="Ej. Cómo colocarse en pista"></div>
+      <div class="field c3"><label>Tipo</label><select id="res_type">
+        ${['Vídeo','Foto','Artículo','Enlace','Contenido de la liga'].map(t => `<option ${resource?.type===t?'selected':''}>${t}</option>`).join('')}
+      </select></div>
+      <div class="field c3"><label>Enlace</label><input id="res_url" value="${escapeHtml(resource?.url || '')}" placeholder="https://..."></div>
+      <div class="field c12"><label>Descripción</label><textarea id="res_description">${escapeHtml(resource?.description || '')}</textarea></div>
+      <div class="c12" style="display:flex;justify-content:flex-end;gap:10px">
+        <button class="btn" onclick="closeModal()">Cancelar</button>
+        <button class="btn primary" onclick="saveResource('${resourceId}')">Guardar</button>
+      </div>
+    </div>
+  `);
+}
+function saveResource(resourceId=''){
+  const title = document.getElementById('res_title').value.trim();
+  const type = document.getElementById('res_type').value.trim();
+  const url = document.getElementById('res_url').value.trim();
+  const description = document.getElementById('res_description').value.trim();
+  if(!title || !url){
+    toast('Debes indicar al menos título y enlace', 'err');
+    return;
+  }
+  const payload = { id: resourceId || uid('res'), title, type, url, description };
+  const idx = state.resources.findIndex(r => r.id === payload.id);
+  if(idx >= 0) state.resources[idx] = payload;
+  else state.resources.unshift(payload);
+  saveState();
+  closeModal();
+  render();
+  toast('Contenido guardado');
+}
+function moveResource(resourceId, direction){
+  const idx = state.resources.findIndex(r => r.id === resourceId);
+  if(idx < 0) return;
+  const newIdx = idx + Number(direction || 0);
+  if(newIdx < 0 || newIdx >= state.resources.length) return;
+  const item = state.resources[idx];
+  state.resources.splice(idx, 1);
+  state.resources.splice(newIdx, 0, item);
+  saveState();
+  render();
+  toast('Orden de contenidos actualizado');
+}
+
+function deleteResource(resourceId){
+  if(!confirm('¿Borrar este contenido?')) return;
+  state.resources = state.resources.filter(r => r.id !== resourceId);
+  saveState();
+  render();
+  toast('Contenido eliminado');
+}
+
+
+function renderNews(){
+  const currentText = String(state.config.newsText || 'Sin novedades').trim() || 'Sin novedades';
+  const currentImage = state.config.newsImage || '';
+  return `
+    <div class="card">
+      <div class="card-title" style="margin-top:14px"><h3>News</h3>${isAdmin ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><span class="badge ok">Editable por administración</span><label class="btn">Subir imagen<input type="file" accept="image/*" class="hidden" data-upload-news-image></label>${currentImage ? `<button class="btn bad" onclick="removeNewsImage()">Quitar imagen</button>` : ``}</div>` : `<span class="badge blue">Información para espectadores</span>`}</div>
+      <div class="news-hero">
+        ${currentImage ? `<div class="news-image-wrap"><img src="${currentImage}" alt="Imagen de novedades"></div>` : ``}
+        <div class="news-panel">
+          <div style="font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin-bottom:12px">Avisos de la semana</div>
+          <div class="news-text">${escapeHtml(currentText)}</div>
+        </div>
+      </div>
+      <p class="small-note" style="margin-top:14px">Usa esta pestaña para avisos de última hora sobre aplazamientos, cambios de calendario, recordatorios u otra información importante de la liga.</p>
+      ${isAdmin ? `
+        <div class="card" style="margin:16px 0 0 0">
+          <div class="card-title"><h3>Editar News</h3></div>
+          <div class="form-grid">
+            <div class="field c12"><label>Texto publicado</label><textarea id="newsTextInput" style="min-height:180px" placeholder="Escribe aquí las novedades de la semana...">${escapeHtml(currentText)}</textarea></div>
+            <div class="c12" style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap">
+              <button class="btn" onclick="setDefaultNews()">Poner “Sin novedades”</button>
+              <button class="btn primary" onclick="saveNewsText()">Guardar News</button>
+            </div>
+          </div>
+        </div>
+      ` : ``}
+    </div>
+  `;
+}
+function saveNewsText(){
+  const input = document.getElementById('newsTextInput');
+  if(!input) return;
+  state.config.newsText = input.value.trim() || 'Sin novedades';
+  saveState();
+  render();
+  toast('News actualizada');
+}
+function setDefaultNews(){
+  state.config.newsText = 'Sin novedades';
+  saveState();
+  render();
+  toast('News restablecida');
+}
+function removeNewsImage(){
+  state.config.newsImage = null;
+  saveState();
+  render();
+  toast('Imagen de News eliminada');
+}
+
+function renderAdmin(){
+  const league = getLeague();
+  const adminTabs = [
+    ['config','Configuración'],
+    ['grupos','Grupos'],
+    ['parejas','Parejas'],
+    ['partidos','Partidos y resultados'],
+    ['aplazados','Partidos aplazados'],
+    ['datos','Exportar / Importar']
+  ];
+  return `
+    <div class="card">
+      <div class="card-title"><h2>Administración</h2><span class="badge ok">Modo administrador</span></div>
+      <div class="subtabs">
+        ${adminTabs.map(([id,label])=>`<button class="seg-btn ${state.ui.adminTab===id?'active':''}" onclick="changeAdminTab('${id}')">${label}</button>`).join('')}
+      </div>
+      ${renderLeaguePills()}
+      <div style="margin-top:14px">${renderAdminTab(league)}</div>
+    </div>
+  `;
+}
+function changeAdminTab(tab){
+  state.ui.adminTab = tab;
+  saveState();
+  render();
+}
+function renderAdminTab(league){
+  if(state.ui.adminTab === 'config') return renderAdminConfig();
+  if(state.ui.adminTab === 'grupos') return renderAdminGroups(league);
+  if(state.ui.adminTab === 'parejas') return renderAdminPairs(league);
+  if(state.ui.adminTab === 'partidos') return renderAdminMatches(league);
+  if(state.ui.adminTab === 'aplazados') return renderAdminPostponed(league);
+  if(state.ui.adminTab === 'datos') return renderAdminData();
+  return '';
+}
+function renderAdminConfig(){
+  return `
+    <div class="grid grid-2">
+      <div class="card" style="margin:0">
+        <div class="card-title"><h3>Cabecera general</h3></div>
+        <div class="form-grid">
+          <div class="field c12"><label>Nombre de la competición</label><input id="cfgTitle" value="${escapeHtml(state.config.title)}"></div>
+          <div class="field c6"><label>Nombre de la liga 1</label><input id="cfgLeague1Name" value="${escapeHtml(state.leagues[0]?.name || 'Liga 1')}"></div>
+          <div class="field c6"><label>Nombre de la liga 2</label><input id="cfgLeague2Name" value="${escapeHtml(state.leagues[1]?.name || 'Liga 2')}"></div>
+          <div class="field c12"><label>Temporada</label><input id="cfgSeason" value="${escapeHtml(state.config.season)}"></div>
+          <div class="field c12"><label>Contraseña de administrador</label><input id="cfgPwd" type="password" value="${escapeHtml(state.config.adminPassword)}"></div>
+          <div class="c12" style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn primary" onclick="saveConfig()">Guardar configuración</button>
+            <label class="btn">Subir logo<input type="file" accept="image/*" class="hidden" data-upload-logo></label>
+            ${state.config.logo ? `<button class="btn bad" onclick="removeLogo()">Quitar logo</button>`:''}
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="card-title"><h3>Vista actual</h3></div>
+        <div class="callout">
+          <div class="badge gold" style="margin-bottom:10px">Cabecera editable</div>
+          <div class="small-note">Puedes cambiar desde aquí el nombre general de la competición y también el nombre visible de cada una de las dos ligas sin tocar el código.</div>
+          <div style="margin-top:16px">
+            <div style="font-weight:600">${escapeHtml(state.config.title)}</div>
+            <div class="muted">Temporada ${escapeHtml(state.config.season)}</div>
+            <div class="small-note" style="margin-top:10px">${escapeHtml(state.leagues[0]?.name || 'Liga 1')} · ${escapeHtml(state.leagues[1]?.name || 'Liga 2')}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+function saveConfig(){
+  state.config.title = document.getElementById('cfgTitle').value.trim() || 'Liga de Pádel Escolar';
+  state.config.season = document.getElementById('cfgSeason').value.trim() || '2025–2026';
+  state.config.adminPassword = document.getElementById('cfgPwd').value.trim() || 'admin123';
+  if(state.leagues[0]) state.leagues[0].name = document.getElementById('cfgLeague1Name').value.trim() || 'Liga 1';
+  if(state.leagues[1]) state.leagues[1].name = document.getElementById('cfgLeague2Name').value.trim() || 'Liga 2';
+  saveState();
+  render();
+  toast('Configuración guardada');
+}
+function removeLogo(){
+  state.config.logo = null;
+  saveState();
+  render();
+  toast('Logo eliminado');
+}
+
+function renderAdminGroups(league){
+  return `
+    <div class="grid grid-2">
+      <div class="card" style="margin:0">
+        <div class="card-title"><h3>Crear grupo vacío</h3></div>
+        <div class="form-grid">
+          <div class="field c8"><label>Nombre del grupo</label><input id="newGroupName" placeholder="Ej. Grupo Lebrón"></div>
+          <div class="field c4"><label>&nbsp;</label><button class="btn primary" onclick="createGroup()">Crear grupo</button></div>
+          <div class="field c12"><label>Generación rápida de grupos</label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <select id="autoGroupSize" style="max-width:220px">
+                ${[2,3,4,5,6,7,8].map(n=>`<option value="${n}">${n} parejas por grupo</option>`).join('')}
+              </select>
+              <button class="btn warn" onclick="autoCreateGroups()">Generar grupos automáticamente</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="card-title"><h3>Generar partidos por grupos</h3></div>
+        <p class="small-note">Cuando ya estén las parejas en sus grupos, genera todos los partidos de la fase de grupos. La primera vuelta y la segunda se programan por separado desde el generador automático semanal o mensual.</p>
+        <button class="btn primary" onclick="createInitialRoundRobinMatches()">Generar partidos base de 1ª vuelta</button>
+        <p class="small-note" style="margin-top:12px">No se generarán partidos duplicados.</p>
+      </div>
+    </div>
+    <div class="grid" style="margin-top:16px">
+      ${league.groups.length ? league.groups.map(g=>{
+        const available = league.pairs.filter(p => !p.groupId || p.groupId === g.id);
+        return `<div class="group-card">
+          <div class="group-head">
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <input value="${escapeHtml(g.name)}" onchange="renameGroup('${g.id}', this.value)" style="max-width:260px">
+              <span class="badge ${league.accent==='future'?'gold':'blue'}">${g.pairIds.length} pareja(s)</span>
+            </div>
+            <button class="btn bad small" onclick="deleteGroup('${g.id}')">Eliminar grupo</button>
+          </div>
+          <div class="chip-list" style="margin-bottom:12px">
+            ${g.pairIds.length ? g.pairIds.map(pid=>{
+              const p = league.pairs.find(x=>x.id===pid);
+              return `<span class="pair-chip">${p ? `${p.j1} / ${p.j2}` : pid}<button onclick="removePairFromGroup('${g.id}','${pid}')">×</button></span>`;
+            }).join('') : `<span class="muted">Grupo vacío</span>`}
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <select id="assign_${g.id}" style="min-width:260px">
+              <option value="">Añadir pareja a este grupo...</option>
+              ${available.filter(p=>!g.pairIds.includes(p.id)).map(p=>`<option value="${p.id}">${p.j1} / ${p.j2}</option>`).join('')}
+            </select>
+            <button class="btn" onclick="assignSelectedToGroup('${g.id}')">Añadir</button>
+          </div>
+        </div>`;
+      }).join('') : `<div class="empty">Todavía no hay grupos creados.</div>`}
+    </div>
+  `;
+}
+function createGroup(){
+  const league = getLeague();
+  const name = document.getElementById('newGroupName').value.trim() || `Grupo ${league.groups.length+1}`;
+  league.groups.push({id: uid('group'), name, pairIds: []});
+  saveState(); render(); toast('Grupo creado');
+}
+function renameGroup(groupId, name){
+  const league = getLeague();
+  const g = league.groups.find(x=>x.id===groupId);
+  if(!g) return;
+  g.name = name.trim() || 'Grupo';
+  saveState(); render(); toast('Nombre de grupo actualizado');
+}
+function deleteGroup(groupId){
+  const league = getLeague();
+  if(!confirm('¿Eliminar este grupo? Las parejas quedarán sin grupo asignado.')) return;
+  const g = league.groups.find(x=>x.id===groupId);
+  if(!g) return;
+  league.pairs.forEach(p => { if(p.groupId === groupId) p.groupId = ''; });
+  league.matches = league.matches.filter(m => m.groupId !== groupId);
+  league.groups = league.groups.filter(x=>x.id!==groupId);
+  saveState(); render(); toast('Grupo eliminado');
+}
+function assignSelectedToGroup(groupId){
+  const select = document.getElementById('assign_'+groupId);
+  const pairId = select.value;
+  if(!pairId) return;
+  assignPairToGroup(pairId, groupId);
+}
+function assignPairToGroup(pairId, groupId){
+  const league = getLeague();
+  const pair = league.pairs.find(p=>p.id===pairId);
+  const target = league.groups.find(g=>g.id===groupId);
+  if(!pair || !target) return;
+  if(target.pairIds.length >= 8){
+    toast('Un grupo no puede tener más de 8 parejas','err');
+    return;
+  }
+  league.groups.forEach(g => g.pairIds = g.pairIds.filter(id => id !== pairId));
+  target.pairIds.push(pairId);
+  pair.groupId = groupId;
+  saveState(); render(); toast('Pareja asignada al grupo');
+}
+function removePairFromGroup(groupId, pairId){
+  const league = getLeague();
+  const g = league.groups.find(x=>x.id===groupId);
+  const p = league.pairs.find(x=>x.id===pairId);
+  if(!g || !p) return;
+  g.pairIds = g.pairIds.filter(id=>id!==pairId);
+  p.groupId = '';
+  saveState(); render(); toast('Pareja quitada del grupo');
+}
+function autoCreateGroups(){
+  const league = getLeague();
+  const size = Number(document.getElementById('autoGroupSize').value);
+  if(!league.pairs.length){
+    toast('No hay parejas inscritas','err');
+    return;
+  }
+  if(!confirm('Se regenerarán los grupos y se eliminarán los partidos existentes de grupos.')) return;
+  league.groups = [];
+  league.matches = league.matches.filter(m => m.manual); // preserve manual if desired
+  league.pairs.forEach(p => p.groupId = '');
+  const ids = league.pairs.map(p=>p.id);
+  for(let i=0;i<ids.length;i+=size){
+    const chunk = ids.slice(i,i+size);
+    const g = { id: uid('group'), name: `Grupo ${league.groups.length+1}`, pairIds: [] };
+    league.groups.push(g);
+    chunk.forEach(pid => {
+      if(g.pairIds.length < 8){
+        g.pairIds.push(pid);
+        const p = league.pairs.find(x=>x.id===pid);
+        if(p) p.groupId = g.id;
+      }
+    });
+  }
+  saveState(); render(); toast('Grupos generados automáticamente');
+}
+function createInitialRoundRobinMatches(){
+  const league = getLeague();
+  const created = generateMissingMatchesForLeg(league, 1);
+  saveState(); render();
+  if(created.length){
+    toast(`Se han creado ${created.length} partidos de 1ª vuelta`);
+  }else{
+    toast('No se ha generado ningún partido nuevo: esos enfrentamientos ya existen en esta vuelta.','err');
+  }
+}
+
+function renderAdminPairs(league){
+  return `
+    <div class="card" style="margin:0 0 16px 0">
+      <div class="card-title"><h3>Inscribir pareja</h3></div>
+      <div class="form-grid">
+        <div class="field c6"><label>Jugador 1</label><input id="p_j1" placeholder="Nombre y apellidos"></div>
+        <div class="field c6"><label>Jugador 2</label><input id="p_j2" placeholder="Nombre y apellidos"></div>
+        <div class="field c4"><label>Curso/Rol J1</label><select id="p_c1">${COURSES.map(x=>`<option>${x}</option>`).join('')}</select></div>
+        <div class="field c4"><label>Curso/Rol J2</label><select id="p_c2">${COURSES.map(x=>`<option>${x}</option>`).join('')}</select></div>
+        <div class="field c4"><label>Jugador reserva</label><input id="p_reserve" placeholder="Opcional"></div>
+        <div class="field c3"><label>Nivel pádel J1</label><select id="p_l1">${LEVELS.map(x=>`<option>${x}</option>`).join('')}</select></div>
+        <div class="field c3"><label>Nivel pádel J2</label><select id="p_l2">${LEVELS.map(x=>`<option>${x}</option>`).join('')}</select></div>
+        <div class="field c2"><label>Pago</label><select id="p_paid"><option value="1">Pagado</option><option value="0">Pendiente</option></select></div>
+        <div class="field c2"><label>Warnings</label><input id="p_warnings" type="number" min="0" max="3" value="0"></div>
+        <div class="field c4"><label>Motivo del warning</label><input id="p_warningNote" placeholder="Opcional"></div>
+        <div class="field c2"><label>Liga de inscripción</label><select id="p_league" onchange="updateAddPairGroupOptions()">${state.leagues.map(l=>`<option value="${l.id}" ${l.id===league.id?'selected':''}>${l.name}</option>`).join('')}</select></div>
+        <div class="field c2"><label>Grupo inicial</label><select id="p_group" data-selected=""><option value="">Sin asignar</option>${league.groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('')}</select><div id="p_group_note" class="small-note" style="margin-top:6px">${league.groups.length?`${league.groups.length} grupo(s) disponible(s) en ${league.name}.`:'⚠ Esta liga todavía no tiene grupos creados. Puedes inscribir la pareja y asignarle grupo después.'}</div></div>
+        <div class="field c12">
+          <label>Días en los que no pueden jugar</label>
+          <div class="days">
+            ${DAYS.map(d=>`<label class="day-chip"><input type="checkbox" value="${d}" name="p_unavailable"> ${d}</label>`).join('')}
+          </div>
+        </div>
+        <div class="c12" style="display:flex;justify-content:flex-end"><button class="btn primary" onclick="addPair()">Añadir pareja</button></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin:0">
+      <div class="card-title"><h3>Parejas inscritas</h3></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Pareja</th><th>Liga</th><th>Curso/Nivel</th><th>Pago</th><th>Warnings</th><th>Motivo</th><th>Estado</th><th>Grupo</th><th>No pueden</th><th>Acciones</th></tr>
+          </thead>
+          <tbody>
+            ${league.pairs.length ? league.pairs.map(p=>{
+              const g = league.groups.find(x=>x.id===p.groupId);
+              return `<tr>
+                <td><div class="pair-stack"><span class="pair-line">${p.j1}</span><span class="pair-line">${p.j2}</span></div><br><span class="small-note">Reserva: ${p.reserve || '—'}</span></td>
+                <td><span class="badge blue">${league.name}</span></td>
+                <td>
+                  <div>${p.course1} · ${p.level1}</div>
+                  <div class="muted">${p.course2} · ${p.level2}</div>
+                </td>
+                <td><span class="badge ${p.paid?'ok':'no'}">${p.paid?'Pagado':'Pendiente'}</span></td>
+                <td>${pairWarningsBadge(p, true)}</td>
+                <td>${escapeHtml(getPairWarningNote(p) || '—')}</td>
+                <td>${pairStatusBadge(p)}</td>
+                <td>
+                  <select onchange="changePairGroup('${p.id}', this.value)">
+                    <option value="">Sin grupo</option>
+                    ${league.groups.map(gr=>`<option value="${gr.id}" ${p.groupId===gr.id?'selected':''}>${gr.name}</option>`).join('')}
+                  </select>
+                </td>
+                <td>${(p.unavailable||[]).length ? p.unavailable.join(', ') : '—'}</td>
+                <td>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn small" onclick="openEditPairModal('${p.id}')">Editar</button>
+                    <button class="btn small ${p.paid?'':'good'}" onclick="togglePaid('${p.id}')">${p.paid?'Marcar pendiente':'Marcar pagado'}</button>
+                    <button class="btn small bad" onclick="deletePair('${p.id}')">Borrar</button>
+                  </div>
+                </td>
+              </tr>`;
+            }).join('') : `<tr><td colspan="10"><div class="empty">No hay parejas todavía.</div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+function updateAddPairGroupOptions(){
+  const leagueId = document.getElementById('p_league')?.value;
+  const select = document.getElementById('p_group');
+  const note = document.getElementById('p_group_note');
+  const league = state.leagues.find(l=>l.id===leagueId);
+  if(!select || !league) return;
+  const groups = league.groups || [];
+  select.innerHTML = `<option value="">Sin asignar</option>${groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('')}`;
+  select.disabled = groups.length===0;
+  select.style.borderColor = groups.length===0 ? 'rgba(255,107,122,.32)' : 'var(--line2)';
+  if(note){
+    note.innerHTML = groups.length===0
+      ? `<span style="color:var(--red)">⚠ Esta liga todavía no tiene grupos creados. Puedes inscribir la pareja y asignarle grupo después.</span>`
+      : `<span style="color:var(--muted)">${groups.length} grupo(s) disponible(s) en ${league.name}.</span>`;
+  }
+}
+function addPair(){
+  const currentLeague = getLeague();
+  const leagueId = document.getElementById('p_league').value || currentLeague.id;
+  const league = state.leagues.find(l=>l.id===leagueId) || currentLeague;
+  const j1 = document.getElementById('p_j1').value.trim();
+  const j2 = document.getElementById('p_j2').value.trim();
+  if(!j1 || !j2){ toast('Debes introducir ambos jugadores','err'); return; }
+  let groupId = document.getElementById('p_group').value || '';
+  if(league.id !== currentLeague.id) groupId = '';
+  const pair = {
+    id: uid('pair'),
+    j1, j2,
+    reserve: document.getElementById('p_reserve').value.trim(),
+    course1: document.getElementById('p_c1').value,
+    course2: document.getElementById('p_c2').value,
+    level1: document.getElementById('p_l1').value,
+    level2: document.getElementById('p_l2').value,
+    paid: document.getElementById('p_paid').value === '1',
+    warnings: Math.min(3, Math.max(0, Number(document.getElementById('p_warnings').value || 0) || 0)),
+    warningNote: document.getElementById('p_warningNote').value.trim(),
+    unavailable: [...document.querySelectorAll('input[name="p_unavailable"]:checked')].map(x=>x.value),
+    groupId
+  };
+  league.pairs.push(pair);
+  if(pair.groupId){
+    const group = league.groups.find(g=>g.id===pair.groupId);
+    if(group){
+      if(group.pairIds.length >= 8){
+        toast('Ese grupo ya tiene 8 parejas','err');
+        league.pairs.pop();
+        return;
+      }
+      group.pairIds.push(pair.id);
+    }
+  }
+  saveState(); render(); toast(`Pareja inscrita en ${league.name}${isPairExpelled(pair)?' · marcada como expulsada por 3 warnings':''}`);
+}
+function changePairGroup(pairId, newGroupId){
+  const league = getLeague();
+  const pair = league.pairs.find(p=>p.id===pairId);
+  if(!pair) return;
+  const target = newGroupId ? league.groups.find(g=>g.id===newGroupId) : null;
+  if(target && target.pairIds.length >= 8 && pair.groupId !== newGroupId){
+    toast('Ese grupo ya tiene 8 parejas','err');
+    render();
+    return;
+  }
+  league.groups.forEach(g => g.pairIds = g.pairIds.filter(id => id !== pairId));
+  pair.groupId = newGroupId || '';
+  if(target) target.pairIds.push(pairId);
+  saveState(); render(); toast('Grupo actualizado');
+}
+function togglePaid(pairId){
+  const pair = getLeague().pairs.find(p=>p.id===pairId);
+  if(!pair) return;
+  pair.paid = !pair.paid;
+  saveState(); render(); toast('Estado de pago actualizado');
+}
+function deletePair(pairId){
+  const league = getLeague();
+  if(!confirm('¿Eliminar esta pareja? También se eliminarán sus partidos.')) return;
+  league.pairs = league.pairs.filter(p=>p.id!==pairId);
+  league.groups.forEach(g=> g.pairIds = g.pairIds.filter(id=>id!==pairId));
+  league.matches = league.matches.filter(m=> m.pairAId!==pairId && m.pairBId!==pairId);
+  saveState(); render(); toast('Pareja eliminada');
+}
+function openEditPairModal(pairId){
+  const league = getLeague();
+  const p = league.pairs.find(x=>x.id===pairId);
+  if(!p) return;
+  openModal('Editar pareja', `
+    <div class="form-grid">
+      <div class="field c6"><label>Jugador 1</label><input id="e_j1" value="${escapeHtml(p.j1)}"></div>
+      <div class="field c6"><label>Jugador 2</label><input id="e_j2" value="${escapeHtml(p.j2)}"></div>
+      <div class="field c4"><label>Curso/Rol J1</label><select id="e_c1">${COURSES.map(x=>`<option ${p.course1===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="field c4"><label>Curso/Rol J2</label><select id="e_c2">${COURSES.map(x=>`<option ${p.course2===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="field c4"><label>Reserva</label><input id="e_reserve" value="${escapeHtml(p.reserve||'')}"></div>
+      <div class="field c2"><label>Nivel J1</label><select id="e_l1">${LEVELS.map(x=>`<option ${p.level1===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="field c2"><label>Nivel J2</label><select id="e_l2">${LEVELS.map(x=>`<option ${p.level2===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="field c2"><label>Pago</label><select id="e_paid"><option value="1" ${p.paid?'selected':''}>Pagado</option><option value="0" ${!p.paid?'selected':''}>Pendiente</option></select></div>
+      <div class="field c2"><label>Warnings</label><input id="e_warnings" type="number" min="0" max="3" value="${getPairWarnings(p)}"></div>
+      <div class="field c4"><label>Motivo del warning</label><input id="e_warningNote" value="${escapeHtml(getPairWarningNote(p))}" placeholder="Opcional"></div>
+      <div class="field c2"><label>Liga</label><select id="e_league" onchange="refreshEditPairGroups('${p.id}')">${state.leagues.map(l=>`<option value="${l.id}" ${l.id===league.id?'selected':''}>${l.name}</option>`).join('')}</select></div>
+      <div class="field c2"><label>Grupo</label><select id="e_group"><option value="">Sin grupo</option>${league.groups.map(g=>`<option value="${g.id}" ${p.groupId===g.id?'selected':''}>${g.name}</option>`).join('')}</select><div id="e_group_note" class="small-note" style="margin-top:6px">${league.groups.length?`${league.groups.length} grupo(s) disponible(s).`:'⚠ Esta liga todavía no tiene grupos creados.'}</div></div>
+      <div class="field c12">
+        <label>Días en los que no pueden jugar</label>
+        <div class="days">${DAYS.map(d=>`<label class="day-chip"><input type="checkbox" value="${d}" name="e_unavailable" ${p.unavailable.includes(d)?'checked':''}> ${d}</label>`).join('')}</div>
+      </div>
+      <div class="c12" style="display:flex;justify-content:flex-end;gap:10px">
+        <button class="btn" onclick="closeModal()">Cancelar</button>
+        <button class="btn primary" onclick="saveEditedPair('${p.id}')">Guardar cambios</button>
+      </div>
+    </div>
+  `);
+}
+function refreshEditPairGroups(pairId){
+  const selectedLeagueId = document.getElementById('e_league').value;
+  const league = state.leagues.find(l=>l.id===selectedLeagueId);
+  const pair = state.leagues.flatMap(l=>l.pairs).find(x=>x.id===pairId);
+  const select = document.getElementById('e_group');
+  const note = document.getElementById('e_group_note');
+  if(!select || !league) return;
+  const currentGroupId = pair && pair.groupId && league.groups.some(g=>g.id===pair.groupId) ? pair.groupId : '';
+  select.innerHTML = `<option value="">Sin grupo</option>${league.groups.map(g=>`<option value="${g.id}" ${currentGroupId===g.id?'selected':''}>${g.name}</option>`).join('')}`;
+  select.disabled = league.groups.length===0;
+  if(note){
+    note.innerHTML = league.groups.length===0
+      ? `<span style="color:var(--red)">⚠ Esta liga todavía no tiene grupos creados.</span>`
+      : `<span style="color:var(--muted)">${league.groups.length} grupo(s) disponible(s).</span>`;
+  }
+}
+function saveEditedPair(pairId){
+  const oldLeague = state.leagues.find(l => l.pairs.some(x=>x.id===pairId));
+  const targetLeague = state.leagues.find(l => l.id === document.getElementById('e_league').value) || oldLeague;
+  const p = oldLeague ? oldLeague.pairs.find(x=>x.id===pairId) : null;
+  if(!p) return;
+  p.j1 = document.getElementById('e_j1').value.trim();
+  p.j2 = document.getElementById('e_j2').value.trim();
+  p.course1 = document.getElementById('e_c1').value;
+  p.course2 = document.getElementById('e_c2').value;
+  p.reserve = document.getElementById('e_reserve').value.trim();
+  p.level1 = document.getElementById('e_l1').value;
+  p.level2 = document.getElementById('e_l2').value;
+  p.paid = document.getElementById('e_paid').value === '1';
+  p.warnings = Math.min(3, Math.max(0, Number(document.getElementById('e_warnings').value || 0) || 0));
+  p.warningNote = document.getElementById('e_warningNote').value.trim();
+  p.unavailable = [...document.querySelectorAll('input[name="e_unavailable"]:checked')].map(x=>x.value);
+  const newGroup = document.getElementById('e_group').value || '';
+  if(oldLeague && targetLeague && oldLeague.id !== targetLeague.id){
+    oldLeague.groups.forEach(g=>g.pairIds=g.pairIds.filter(id=>id!==pairId));
+    oldLeague.matches = oldLeague.matches.filter(m=>m.pairAId!==pairId && m.pairBId!==pairId);
+    oldLeague.pairs = oldLeague.pairs.filter(x=>x.id!==pairId);
+    p.groupId = '';
+    targetLeague.pairs.push(p);
+  }
+  changePairGroupNoRender(pairId, newGroup, targetLeague.id);
+  saveState(); closeModal(); render(); toast('Pareja actualizada');
+}
+function changePairGroupNoRender(pairId, groupId, leagueId){
+  const league = state.leagues.find(l=>l.id===leagueId) || getLeague();
+  const pair = league.pairs.find(p=>p.id===pairId);
+  if(!pair) return;
+  league.groups.forEach(g=>g.pairIds=g.pairIds.filter(id=>id!==pairId));
+  pair.groupId = groupId;
+  if(groupId){
+    const g = league.groups.find(x=>x.id===groupId);
+    if(g && g.pairIds.length < 8 && !g.pairIds.includes(pairId)) g.pairIds.push(pairId);
+    else if(g && g.pairIds.length >= 8 && !g.pairIds.includes(pairId)) pair.groupId = '';
+  }
+}
+
+function renderAdminMatches(league){
+  const allMatches = [...league.matches].sort((a,b) => {
+    const dateA = a.scheduledDate || '9999-99-99';
+    const dateB = b.scheduledDate || '9999-99-99';
+    if(dateA !== dateB) return dateA.localeCompare(dateB);
+    if(a.played !== b.played) return a.played - b.played;
+    return (a.scheduledWeek || '').localeCompare(b.scheduledWeek || '') || a.id.localeCompare(b.id);
+  });
+  const pending = allMatches.filter(m=>!m.played).length;
+  const played = allMatches.filter(m=>m.played).length;
+  return `
+    <div class="grid grid-2">
+      <div class="card" style="margin:0">
+        <div class="card-title">
+          <h3>Generación y edición manual</h3>
+          <button class="btn primary" onclick="openManualMatchModal()">Nuevo partido manual</button>
+        </div>
+        <p class="small-note">Puedes crear o modificar partidos manualmente para atender cambios de última hora, excursiones o incidencias. No se permite duplicar un enfrentamiento dentro de la misma vuelta ni crear partidos entre parejas de grupos distintos.</p>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="card-title">
+          <h3>Calendario automático</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn warn" onclick="openScheduleModal()">Abrir generador automático</button>
+            <button class="btn bad" onclick="deleteAllScheduledMatches()">Borrar todos los programados</button>
+          </div>
+        </div>
+        <p class="small-note">El generador evita repetir partidos de la misma vuelta ya programados o jugados, reparte los grupos de forma equilibrada dentro del periodo elegido y permite generar por semanas o por meses. La segunda vuelta se desbloquea cuando la primera está completamente jugada. Si un día ya tiene partidos asignados, no se volverá a usar y se te avisará.</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-title"><h3>Partidos pendientes y jugados (${allMatches.length})</h3><span class="badge">${pending} pendientes · ${played} jugados</span></div>
+      ${allMatches.length ? allMatches.map(m => renderAdminMatchLine(league,m)).join('') : `<div class="empty">Todavía no hay partidos creados.</div>`}
+    </div>
+  `;
+}
+
+function renderAdminMatchLine(league,m){
+  const a = league.pairs.find(p=>p.id===m.pairAId);
+  const b = league.pairs.find(p=>p.id===m.pairBId);
+  const g = league.groups.find(x=>x.id===m.groupId);
+  return `
+    <div class="match-admin-row">
+      <div class="match-admin-main">
+        <span class="badge ${league.accent==='future'?'gold':'blue'}">${g?.name || 'Sin grupo'}</span>
+        <div class="match-admin-teams">
+          <div class="match-team-line">${a?.j1 || '?'} / ${a?.j2 || '?'}</div>
+          <div class="match-team-line">${b?.j1 || '?'} / ${b?.j2 || '?'}</div>
+        </div>
+      </div>
+      <div class="match-admin-side">
+        <span class="badge blue">${m.scheduledDate ? formatDateEs(m.scheduledDate) : 'Sin fecha'}</span>
+        <span class="badge ${Number(m.leg)===1?'gold':'blue'}">${Number(m.leg)===1?'1ª vuelta':'2ª vuelta'} ${m.manual?'· Manual':''}</span>
+        ${m.postponed ? `<span class="badge gold">Aplazado</span>` : ``}
+        <div class="match-result-actions">
+          ${m.played ? `<div class="score">${m.scoreA}–${m.scoreB}</div>` : `<span class="badge">Pendiente</span>`}
+          ${m.notes ? `<div class="match-note"><strong>Observación:</strong> ${escapeHtml(m.notes)}</div>` : ``}
+          <div class="match-admin-actions">
+            ${!m.played && m.scheduledDate ? `<button class="btn small" onclick="openRescheduleModal('${m.id}')">Editar fecha</button>` : ``}
+            <button class="btn small" onclick="openEditMatchModal('${m.id}')">${m.played?'Editar partido':'Gestionar partido'}</button>
+            <button class="btn small bad" onclick="deleteMatch('${m.id}')">Borrar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+function openManualMatchModal(matchId=''){
+  const league = getLeague();
+  const match = matchId ? league.matches.find(m=>m.id===matchId) : null;
+  openModal(match ? 'Editar partido manual' : 'Nuevo partido manual', `
+    <div class="form-grid">
+      <div class="field c6"><label>Pareja A</label><select id="m_a">${league.pairs.map(p=>`<option value="${p.id}" ${match?.pairAId===p.id?'selected':''}>${p.j1} / ${p.j2}</option>`).join('')}</select></div>
+      <div class="field c6"><label>Pareja B</label><select id="m_b">${league.pairs.map(p=>`<option value="${p.id}" ${match?.pairBId===p.id?'selected':''}>${p.j1} / ${p.j2}</option>`).join('')}</select></div>
+      <div class="field c4"><label>Grupo</label><select id="m_group"><option value="">Sin grupo</option>${league.groups.map(g=>`<option value="${g.id}" ${match?.groupId===g.id?'selected':''}>${g.name}</option>`).join('')}</select></div>
+      <div class="field c4"><label>Fecha</label><input id="m_date" type="date" value="${match?.scheduledDate||''}"></div>
+      <div class="field c4"><label>Vuelta</label><select id="m_leg"><option value="1" ${Number(match?.leg||1)===1?'selected':''}>1ª vuelta</option><option value="2" ${Number(match?.leg)===2?'selected':''}>2ª vuelta</option></select></div>
+      <div class="field c6"><label>Resultado A</label><input id="m_sa" type="number" min="0" value="${match?.scoreA ?? ''}"></div>
+      <div class="field c6"><label>Resultado B</label><input id="m_sb" type="number" min="0" value="${match?.scoreB ?? ''}"></div>
+      <div class="field c12"><label>Notas</label><textarea id="m_notes">${escapeHtml(match?.notes||'')}</textarea></div>
+      <div class="field c12"><label class="day-chip" style="width:max-content"><input id="m_postponed" type="checkbox" ${match?.postponed?'checked':''}> Marcar partido como aplazado</label></div>
+      <div class="c12" style="display:flex;justify-content:flex-end;gap:10px">
+        <button class="btn" onclick="closeModal()">Cancelar</button>
+        <button class="btn primary" onclick="saveManualMatch('${matchId}')">Guardar partido</button>
+      </div>
+    </div>
+  `);
+}
+function saveManualMatch(matchId=''){
+  const league = getLeague();
+  const existingMatch = matchId ? league.matches.find(m=>m.id===matchId) : null;
+  const pairAId = document.getElementById('m_a').value;
+  const pairBId = document.getElementById('m_b').value;
+  if(!pairAId || !pairBId || pairAId === pairBId){
+    toast('Debes elegir dos parejas distintas','err');
+    return;
+  }
+  const leg = Number(document.getElementById('m_leg').value);
+  const pairA = league.pairs.find(p=>p.id===pairAId);
+  const pairB = league.pairs.find(p=>p.id===pairBId);
+  const validA = validateActivePair(pairA);
+  const validB = validateActivePair(pairB);
+  if(!validA.ok) return toast(validA.message, 'err');
+  if(!validB.ok) return toast(validB.message, 'err');
+
+  const matchupChanged = !existingMatch || existingMatch.pairAId !== pairAId || existingMatch.pairBId !== pairBId || Number(existingMatch.leg) !== leg;
+  if(matchupChanged && hasDuplicateMatchInLeg(league, pairAId, pairBId, leg, matchId)){
+    toast(`No se puede crear ese partido: esas parejas ya tienen un enfrentamiento registrado en la ${leg}ª vuelta. Solo podrán volver a enfrentarse en la siguiente vuelta.`, 'err');
+    return;
+  }
+  const selectedGroupId = document.getElementById('m_group').value || '';
+  const sameGroupCheck = validateSameGroupMatch(league, pairAId, pairBId, selectedGroupId);
+  if(!sameGroupCheck.ok){
+    toast(sameGroupCheck.message, 'err');
+    return;
+  }
+  const scoreA = document.getElementById('m_sa').value;
+  const scoreB = document.getElementById('m_sb').value;
+  const payload = {
+    id: matchId || uid('match'),
+    groupId: sameGroupCheck.groupId,
+    pairAId,
+    pairBId,
+    leg,
+    scheduledDate: document.getElementById('m_date').value || '',
+    scheduledWeek: document.getElementById('m_date').value ? isoWeekLabelFromMonday(mondayOf(document.getElementById('m_date').value)) : '',
+    played: scoreA !== '' && scoreB !== '',
+    scoreA: scoreA === '' ? '' : Number(scoreA),
+    scoreB: scoreB === '' ? '' : Number(scoreB),
+    manual: true,
+    notes: document.getElementById('m_notes').value.trim(),
+    postponed: document.getElementById('m_postponed').checked
+  };
+  if(matchId){
+    const idx = league.matches.findIndex(m=>m.id===matchId);
+    if(idx>=0) league.matches[idx] = payload;
+  }else{
+    league.matches.push(payload);
+  }
+  saveState(); closeModal(); render(); toast('Partido guardado');
+}
+function openRescheduleModal(matchId){
+  const league = getLeague();
+  const match = league.matches.find(m=>m.id===matchId);
+  if(!match) return;
+  const a = league.pairs.find(p=>p.id===match.pairAId);
+  const b = league.pairs.find(p=>p.id===match.pairBId);
+  openModal('Editar fecha del partido', `
+    <div class="form-grid">
+      <div class="field c12">
+        <label>Partido programado</label>
+        <div class="small-note" style="padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg2);color:var(--txt)">
+          <strong>${a?.j1 || '?'} / ${a?.j2 || '?'}</strong> · vs · <strong>${b?.j1 || '?'} / ${b?.j2 || '?'}</strong>
+        </div>
+      </div>
+      <div class="field c12"><label>Nueva fecha</label><input id="rs_date" type="date" value="${match.scheduledDate||''}"></div>
+      <div class="field c12"><label>Observación visible para espectadores</label><textarea id="rs_notes">${escapeHtml(match.notes||'')}</textarea></div>
+      <div class="field c12"><label class="day-chip" style="width:max-content"><input id="rs_postponed" type="checkbox" ${match.postponed?'checked':''}> Marcar partido como aplazado</label></div>
+      <div class="c12" style="display:flex;justify-content:flex-end;gap:10px">
+        <button class="btn" onclick="closeModal()">Cancelar</button>
+        <button class="btn primary" onclick="saveRescheduledDate('${match.id}')">Guardar fecha</button>
+      </div>
+    </div>
+  `);
+}
+function saveRescheduledDate(matchId){
+  const league = getLeague();
+  const match = league.matches.find(m=>m.id===matchId);
+  if(!match) return;
+  const newDate = document.getElementById('rs_date').value || '';
+  if(!newDate){
+    toast('Debes indicar una fecha válida','err');
+    return;
+  }
+  match.scheduledDate = newDate;
+  match.scheduledWeek = isoWeekLabelFromMonday(mondayOf(newDate));
+  match.notes = document.getElementById('rs_notes').value.trim();
+  match.postponed = document.getElementById('rs_postponed').checked;
+  saveState(); closeModal(); render(); toast('Fecha actualizada');
+}
+
+function openEditMatchModal(matchId){
+  const league = getLeague();
+  const match = league.matches.find(m=>m.id===matchId);
+  if(!match) return;
+  if(match.manual) return openManualMatchModal(matchId);
+  openModal(match.played ? 'Editar partido' : 'Gestionar partido', `
+    <div class="form-grid">
+      <div class="field c6"><label>Juegos pareja A (opcional)</label><input id="r_a" type="number" min="0" value="${match.scoreA ?? ''}"></div>
+      <div class="field c6"><label>Juegos pareja B (opcional)</label><input id="r_b" type="number" min="0" value="${match.scoreB ?? ''}"></div>
+      <div class="field c12"><label>Fecha (opcional)</label><input id="r_date" type="date" value="${match.scheduledDate||''}"></div>
+      <div class="field c12"><label>Observación visible para espectadores</label><textarea id="r_notes">${escapeHtml(match.notes||'')}</textarea></div>
+      <div class="field c12"><label class="day-chip" style="width:max-content"><input id="r_postponed" type="checkbox" ${match.postponed?'checked':''}> Marcar partido como aplazado</label></div>
+      <div class="c12" style="display:flex;justify-content:flex-end;gap:10px">
+        <button class="btn" onclick="closeModal()">Cancelar</button>
+        <button class="btn primary" onclick="saveMatchResult('${match.id}')">Guardar cambios</button>
+      </div>
+    </div>
+  `);
+}
+function saveMatchResult(matchId){
+  const league = getLeague();
+  const match = league.matches.find(m=>m.id===matchId);
+  if(!match) return;
+  const scoreAValue = document.getElementById('r_a').value.trim();
+  const scoreBValue = document.getElementById('r_b').value.trim();
+  const hasScoreA = scoreAValue !== '';
+  const hasScoreB = scoreBValue !== '';
+
+  if((hasScoreA && !hasScoreB) || (!hasScoreA && hasScoreB)){
+    toast('Si introduces resultado, debes completar ambos marcadores','err');
+    return;
+  }
+
+  if(hasScoreA && hasScoreB){
+    match.scoreA = Number(scoreAValue);
+    match.scoreB = Number(scoreBValue);
+    match.played = true;
+  }else{
+    match.scoreA = '';
+    match.scoreB = '';
+    match.played = false;
+  }
+
+  match.scheduledDate = document.getElementById('r_date').value || match.scheduledDate || '';
+  match.notes = document.getElementById('r_notes').value.trim();
+  match.postponed = document.getElementById('r_postponed').checked;
+  if(match.scheduledDate){
+    match.scheduledWeek = isoWeekLabelFromMonday(mondayOf(match.scheduledDate));
+  }
+  saveState();
+  closeModal();
+  render();
+  toast(hasScoreA && hasScoreB ? 'Resultado guardado' : 'Partido actualizado');
+}
+function deleteMatch(matchId){
+  const league = getLeague();
+  if(!confirm('¿Eliminar este partido?')) return;
+  league.matches = league.matches.filter(m=>m.id!==matchId);
+  saveState(); render(); toast('Partido eliminado');
+}
+
+function openScheduleModal(){
+  const league = getLeague();
+  const firstLegDone = allFirstLegCompleted(league);
+  const today = new Date();
+  const defaultMonday = mondayOf(formatDateInput(today));
+  openModal('Generador automático de calendario', `
+    <div class="form-grid">
+      <div class="field c4"><label>Periodo</label>
+        <select id="sch_mode">
+          <option value="week">Semanal</option>
+          <option value="month">Mensual</option>
+        </select>
+      </div>
+      <div class="field c4"><label>Fecha de referencia</label><input id="sch_anchor" type="date" value="${formatDateInput(defaultMonday)}"></div>
+      <div class="field c4"><label>Vuelta</label>
+        <select id="sch_leg">
+          <option value="1">1ª vuelta</option>
+          <option value="2" ${firstLegDone?'':'disabled'}>2ª vuelta</option>
+        </select>
+      </div>
+      <div class="field c4"><label>Máximo de partidos por día</label><input id="sch_max" type="number" min="1" value="2"></div>
+      <div class="field c8">
+        <label>Días en los que se puede jugar</label>
+        <div class="days">
+          ${DAYS.map((d,i)=>`<label class="day-chip"><input type="checkbox" name="sch_days" value="${d}" ${i<5?'checked':''}> ${d}</label>`).join('')}
+        </div>
+      </div>
+      <div class="c12">
+        <div class="small-note">El generador rota los grupos de forma equilibrada dentro del periodo elegido y, además, prioriza que las parejas acumulen un número parecido de partidos por semana dentro de lo posible. Si un día seleccionado ya tiene partidos asignados, ese día se omitirá y se te avisará.</div>
+        <div class="small-note" style="margin-top:6px">${firstLegDone ? 'La 2ª vuelta ya está disponible.' : 'La 2ª vuelta se desbloquea cuando toda la 1ª vuelta esté jugada.'}</div>
+      </div>
+      <div class="c12" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <button class="btn bad" onclick="deleteAllScheduledMatches(true)">Borrar todos los programados</button>
+        <div style="display:flex;gap:10px">
+          <button class="btn" onclick="closeModal()">Cancelar</button>
+          <button class="btn primary" onclick="runScheduleGeneration()">Generar calendario</button>
+        </div>
+      </div>
+    </div>
+  `);
+}
+function deleteAllScheduledMatches(fromModal=false){
+  const league = getLeague();
+  const scheduled = league.matches.filter(m=>m.scheduledDate || m.scheduledWeek);
+  if(!scheduled.length){
+    toast('No hay partidos programados para borrar','err');
+    return;
+  }
+  if(!confirm(`¿Borrar de una vez los ${scheduled.length} partidos programados? Los resultados ya jugados se mantendrán.`)) return;
+  league.matches.forEach(m=>{
+    if(!m.played){
+      m.scheduledDate = '';
+      m.scheduledWeek = '';
+    }
+  });
+  saveState();
+  if(fromModal) closeModal();
+  render();
+  toast('Partidos programados borrados');
+}
+function runScheduleGeneration(){
+  const league = getLeague();
+  const anchorStr = document.getElementById('sch_anchor').value;
+  const mode = document.getElementById('sch_mode').value;
+  const leg = Number(document.getElementById('sch_leg').value);
+  const max = Number(document.getElementById('sch_max').value || 2);
+  const days = [...document.querySelectorAll('input[name="sch_days"]:checked')].map(x=>x.value);
+  if(!anchorStr || !days.length){
+    toast('Debes elegir un periodo y al menos un día','err');
+    return;
+  }
+  try{
+    const res = schedulePeriodForLeague(league.id, anchorStr, days, leg, max, mode);
+    saveState();
+    closeModal();
+    render();
+    if(res.assigned && res.skippedDates.length){
+      toast(`Programados ${res.assigned}. Omitidos ${res.skippedDates.length} días ya ocupados.`);
+    }else if(res.assigned){
+      toast(`Se han programado ${res.assigned} partidos`);
+    }else if(res.skippedDates.length){
+      toast('No se programó nada: los días elegidos ya tenían partidos asignados','err');
+    }else{
+      toast('No había partidos disponibles para programar');
+    }
+  }catch(err){
+    toast(err.message, 'err');
+  }
+}
+
+
+function getPlayoffCandidates(league){
+  const standings = computeStandings(league.id);
+  const firsts = [], seconds = [], thirds = [];
+  standings.forEach(({group, rows})=>{
+    const eligible = rows.filter(r => !r.expelled);
+    if(eligible[0]) firsts.push({...eligible[0], groupName: group.name});
+    if(eligible[1]) seconds.push({...eligible[1], groupName: group.name});
+    if(eligible[2]) thirds.push({...eligible[2], groupName: group.name});
+  });
+  thirds.sort((a,b)=> b.points-a.points || b.diff-a.diff || b.gf-a.gf || a.pair.j1.localeCompare(b.pair.j1));
+  const out = [...firsts, ...seconds];
+  if(out.length < 8) out.push(...thirds.slice(0, 8-out.length));
+  return out.slice(0,8);
+}
+function seedLabel(n){ return `S${n}`; }
+function createPlayoffMatch(round,name,seedA,seedB,pairAId,pairBId){
+  return { id: uid('po'), round, name, seedA, seedB, pairAId: pairAId||'', pairBId: pairBId||'', played:false, scoreA:'', scoreB:'', winnerId:'' };
+}
+function generatePlayoffs(){
+  const league = getLeague();
+  const candidates = getPlayoffCandidates(league);
+  if(candidates.length < 8){ toast('Se necesitan 8 parejas clasificadas para generar el cuadro','err'); return; }
+  if(!confirm('¿Generar el cuadro de playoffs? Si ya existe, se sustituirá.')) return;
+  const s = candidates;
+  league.playoffMatches = [
+    createPlayoffMatch('qf','Cuartos 1',1,8,s[0].pairId,s[7].pairId),
+    createPlayoffMatch('qf','Cuartos 2',4,5,s[3].pairId,s[4].pairId),
+    createPlayoffMatch('qf','Cuartos 3',2,7,s[1].pairId,s[6].pairId),
+    createPlayoffMatch('qf','Cuartos 4',3,6,s[2].pairId,s[5].pairId),
+    createPlayoffMatch('sf','Semifinal 1',0,0,'',''),
+    createPlayoffMatch('sf','Semifinal 2',0,0,'',''),
+    createPlayoffMatch('f','Final',0,0,'','')
+  ];
+  saveState(); render(); toast('Cuadro de playoffs generado');
+}
+function updatePlayoffProgress(league){
+  if(!Array.isArray(league.playoffMatches) || !league.playoffMatches.length) return;
+  const qf = league.playoffMatches.filter(m=>m.round==='qf');
+  const sf = league.playoffMatches.filter(m=>m.round==='sf');
+  const f = league.playoffMatches.find(m=>m.round==='f');
+  if(sf[0]){ sf[0].pairAId = qf[0]?.winnerId || ''; sf[0].pairBId = qf[1]?.winnerId || ''; if(!sf[0].pairAId || !sf[0].pairBId){ sf[0].played=false; sf[0].scoreA=''; sf[0].scoreB=''; sf[0].winnerId=''; } }
+  if(sf[1]){ sf[1].pairAId = qf[2]?.winnerId || ''; sf[1].pairBId = qf[3]?.winnerId || ''; if(!sf[1].pairAId || !sf[1].pairBId){ sf[1].played=false; sf[1].scoreA=''; sf[1].scoreB=''; sf[1].winnerId=''; } }
+  if(f){ f.pairAId = sf[0]?.winnerId || ''; f.pairBId = sf[1]?.winnerId || ''; if(!f.pairAId || !f.pairBId){ f.played=false; f.scoreA=''; f.scoreB=''; f.winnerId=''; } }
+}
+function clearPlayoffs(){
+  const league = getLeague();
+  if(!league.playoffMatches?.length){ toast('No hay playoffs generados','err'); return; }
+  if(!confirm('¿Borrar todo el cuadro de playoffs?')) return;
+  league.playoffMatches = [];
+  saveState(); render(); toast('Playoffs borrados');
+}
+function setPlayoffResult(matchId){
+  const league = getLeague();
+  const m = league.playoffMatches.find(x=>x.id===matchId);
+  if(!m) return;
+  const a = league.pairs.find(p=>p.id===m.pairAId);
+  const b = league.pairs.find(p=>p.id===m.pairBId);
+  if(!a || !b){ toast('Ese partido aún no tiene dos parejas definidas','err'); return; }
+  openModal(`Resultado · ${m.name}`, `
+    <div class="form-grid"> 
+      <div class="field c6"><label>${a.j1} / ${a.j2}</label><input type="number" id="po_scoreA" min="0" value="${m.scoreA!==''?m.scoreA:''}"></div>
+      <div class="field c6"><label>${b.j1} / ${b.j2}</label><input type="number" id="po_scoreB" min="0" value="${m.scoreB!==''?m.scoreB:''}"></div>
+      <div class="c12" style="display:flex;justify-content:flex-end;gap:10px"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="savePlayoffResult('${m.id}')">Guardar</button></div>
+    </div>
+  `);
+}
+function savePlayoffResult(matchId){
+  const league = getLeague();
+  const m = league.playoffMatches.find(x=>x.id===matchId);
+  if(!m) return;
+  const a = Number(document.getElementById('po_scoreA').value);
+  const b = Number(document.getElementById('po_scoreB').value);
+  if(Number.isNaN(a) || Number.isNaN(b)){ toast('Introduce ambos resultados','err'); return; }
+  m.scoreA = a; m.scoreB = b; m.played = true; m.winnerId = a>=b ? m.pairAId : m.pairBId;
+  updatePlayoffProgress(league);
+  saveState(); closeModal(); render(); toast('Resultado del playoff guardado');
+}
+function getPlayoffChampion(league){
+  const f = (league.playoffMatches||[]).find(m=>m.round==='f' && m.played && m.winnerId);
+  return f ? league.pairs.find(p=>p.id===f.winnerId) : null;
+}
+function renderPlayoffMatchCard(league,m){
+  const a = league.pairs.find(p=>p.id===m.pairAId);
+  const b = league.pairs.find(p=>p.id===m.pairBId);
+  const ready = a && b;
+  return `<div class="group-card" style="margin-bottom:12px">
+    <div class="group-head"><strong>${m.name}</strong>${m.seedA?`<span class="small-note">${seedLabel(m.seedA)} vs ${seedLabel(m.seedB)}</span>`:''}</div>
+    <div class="match-item">
+      <div class="match-pair-block"><div class="pair-name">${a ? `${a.j1} / ${a.j2}` : 'Por definir'}</div></div>
+      <span class="match-vs">VS</span>
+      <div class="match-pair-block"><div class="pair-sub">${b ? `${b.j1} / ${b.j2}` : 'Por definir'}</div></div>
+      ${m.played ? `<div class="score">${m.scoreA}–${m.scoreB}</div><span class="badge ok">Resultado guardado</span>` : `<span class="badge">${ready?'Pendiente':'Esperando cruce'}</span>`}
+      ${isAdmin ? `<button class="btn small primary" onclick="setPlayoffResult('${m.id}')" ${ready?'':'disabled'}>${m.played?'Editar':'Introducir'} resultado</button>` : ''}
+    </div>
+  </div>`;
+}
+function renderPlayoffs(){
+  const league = getLeague();
+  const candidates = getPlayoffCandidates(league);
+  const champion = getPlayoffChampion(league);
+  const qf = (league.playoffMatches||[]).filter(m=>m.round==='qf');
+  const sf = (league.playoffMatches||[]).filter(m=>m.round==='sf');
+  const f = (league.playoffMatches||[]).filter(m=>m.round==='f');
+  return `
+    <div class="card">
+      ${renderLeaguePills()}
+      <div class="card-title" style="margin-top:14px">
+        <h3>Playoffs · ${league.name}</h3>
+        ${isAdmin ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn warn" onclick="generatePlayoffs()">Generar cuadro</button>${league.playoffMatches?.length?`<button class="btn bad" onclick="clearPlayoffs()">Borrar cuadro</button>`:''}</div>`:''}
+      </div>
+      <div class="grid grid-2">
+        <div class="card" style="margin:0">
+          <div class="card-title"><h3>Clasificados</h3><span class="badge ${candidates.length>=8?'ok':'warn'}">${candidates.length}/8</span></div>
+          ${candidates.length ? `<div class="table-wrap"><table><thead><tr><th>Seed</th><th>Pareja</th><th>Grupo</th><th>Pts</th><th>Dif</th></tr></thead><tbody>${candidates.map((r,i)=>`<tr><td>${i+1}</td><td><div class="pair-stack"><span class="pair-line">${r.pair.j1}</span><span class="pair-line">${r.pair.j2}</span></div></td><td>${r.groupName}</td><td>${r.points}</td><td>${r.diff>0?'+':''}${r.diff}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty">Aún no hay clasificados.</div>`}
+          <p class="small-note" style="margin-top:10px">Se clasifican los 2 primeros de cada grupo y, si hace falta, los mejores terceros hasta completar 8 parejas.</p>
+        </div>
+        <div class="card" style="margin:0">
+          <div class="card-title"><h3>Estado del cuadro</h3></div>
+          ${champion ? `<div class="callout"><div class="badge gold" style="margin-bottom:10px">Campeón</div><div style="font-size:20px;font-weight:800">${champion.j1} / ${champion.j2}</div></div>` : `<div class="small-note">Cuando se juegue la final, aquí aparecerá la pareja campeona.</div>`}
+        </div>
+      </div>
+      ${league.playoffMatches?.length ? `
+        <div class="grid grid-3" style="margin-top:16px">
+          <div><div class="card-title"><h3>Cuartos</h3></div>${qf.map(m=>renderPlayoffMatchCard(league,m)).join('')}</div>
+          <div><div class="card-title"><h3>Semifinales</h3></div>${sf.map(m=>renderPlayoffMatchCard(league,m)).join('')}</div>
+          <div><div class="card-title"><h3>Final</h3></div>${f.map(m=>renderPlayoffMatchCard(league,m)).join('')}</div>
+        </div>` : `<div class="empty" style="margin-top:16px">Todavía no se ha generado el cuadro de playoffs.</div>`}
+    </div>`;
+}
+
+function generatePostponedList(){
+  state.ui.showPostponedList = true;
+  saveState();
+  render();
+  toast('Listado de partidos aplazados generado');
+}
+function hidePostponedList(){
+  state.ui.showPostponedList = false;
+  saveState();
+  render();
+}
+function renderAdminPostponed(league){
+  const postponedMatches = [...league.matches]
+    .filter(m => m.postponed)
+    .sort((a,b) => {
+      const dateA = a.scheduledDate || '9999-99-99';
+      const dateB = b.scheduledDate || '9999-99-99';
+      if(dateA !== dateB) return dateA.localeCompare(dateB);
+      if(a.played !== b.played) return a.played - b.played;
+      return (a.scheduledWeek || '').localeCompare(b.scheduledWeek || '') || a.id.localeCompare(b.id);
+    });
+
+  return `
+    <div class="grid grid-2">
+      <div class="card" style="margin:0">
+        <div class="card-title">
+          <h3>Listado de partidos aplazados</h3>
+          <span class="badge gold">${postponedMatches.length} aplazado(s)</span>
+        </div>
+        <p class="small-note">Pulsa el botón para generar la lista de todos los partidos que tengan marcado el tick de aplazado en la ${league.name}. Desde la propia lista podrás seguir gestionando cada partido.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn primary" onclick="generatePostponedList()">Generar lista de aplazados</button>
+          ${state.ui.showPostponedList ? `<button class="btn" onclick="hidePostponedList()">Ocultar lista</button>` : ``}
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="card-title"><h3>Qué puedes hacer desde aquí</h3></div>
+        <div class="group-card">
+          <div class="small-note">En cada partido aplazado puedes:</div>
+          <div class="chip-list" style="margin-top:10px">
+            <span class="badge blue">Editar fecha</span>
+            <span class="badge blue">Gestionar resultado</span>
+            <span class="badge blue">Cambiar observaciones</span>
+            <span class="badge blue">Quitar o mantener el aplazado</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${state.ui.showPostponedList ? `
+      <div class="card" style="margin-top:16px">
+        <div class="card-title"><h3>Partidos aplazados de ${league.name}</h3><span class="badge gold">${postponedMatches.length}</span></div>
+        ${postponedMatches.length ? postponedMatches.map(m => renderAdminPostponedLine(league,m)).join('') : `<div class="empty">No hay partidos aplazados en esta liga.</div>`}
+      </div>
+    ` : ``}
+  `;
+}
+function renderAdminPostponedLine(league,m){
+  const a = league.pairs.find(p=>p.id===m.pairAId);
+  const b = league.pairs.find(p=>p.id===m.pairBId);
+  const g = league.groups.find(x=>x.id===m.groupId);
+  return `
+    <div class="match-admin-row">
+      <div class="match-admin-main">
+        <span class="badge gold">Aplazado</span>
+        <div class="match-admin-teams">
+          <div class="match-team-line">${a?.j1 || '?'} / ${a?.j2 || '?'}</div>
+          <div class="match-team-line">${b?.j1 || '?'} / ${b?.j2 || '?'}</div>
+          <div class="small-note">${g?.name || 'Sin grupo'} · ${m.scheduledDate ? formatDateEs(m.scheduledDate) : 'Sin fecha asignada'} · ${Number(m.leg)===1?'1ª vuelta':'2ª vuelta'}${m.manual?' · Manual':''}</div>
+          ${m.notes ? `<div class="small-note" style="color:var(--txt)"><strong>Observación:</strong> ${escapeHtml(m.notes)}</div>` : `<div class="small-note">Sin observación visible.</div>`}
+        </div>
+      </div>
+      <div class="match-admin-side">
+        ${m.played ? `<div class="score">${m.scoreA}–${m.scoreB}</div><span class="badge ok">Jugado</span>` : `<span class="badge">Pendiente</span>`}
+        <div class="match-admin-actions">
+          ${m.scheduledDate ? `<button class="btn small" onclick="openRescheduleModal('${m.id}')">Editar fecha</button>` : `<button class="btn small" onclick="openRescheduleModal('${m.id}')">Poner fecha</button>`}
+          <button class="btn small primary" onclick="openEditMatchModal('${m.id}')">Gestionar partido</button>
+          <button class="btn small bad" onclick="deleteMatch('${m.id}')">Borrar</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderAdminData(){
+  return `
+    <div class="grid grid-2">
+      <div class="card" style="margin:0">
+        <div class="card-title"><h3>Exportar</h3></div>
+        <p class="small-note">La web guarda los datos en Firebase en tiempo real. Aun así, puedes descargar una copia completa en JSON como respaldo y restauración de la web, incluyendo nombres de ligas, grupos, parejas, partidos, observaciones, aplazamientos, playoffs, imagen de normas y contenidos enlazados, y un Excel de consulta para visualizar lo más importante de forma clara.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn primary" onclick="exportJSON()">Exportar JSON</button>
+          <button class="btn good" onclick="exportExcel()">Exportar Excel</button>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="card-title"><h3>Importar</h3></div>
+        <p class="small-note">La importación sustituye los datos actuales. En esta versión, la restauración se hace solo mediante JSON, que conserva la estructura completa de ligas, grupos, parejas, partidos, observaciones, aplazamientos, playoffs, imagen de normas y contenidos enlazados.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+          <label class="btn">Importar JSON<input class="hidden" type="file" accept=".json" data-import-json></label>
+          
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="card-title"><h3>Resumen actual</h3></div>
+      ${state.leagues.map(l=>`
+        <div class="group-card" style="margin-bottom:12px">
+          <strong>${l.name}</strong>
+          <div class="chip-list" style="margin-top:10px">
+            <span class="badge">${l.pairs.length} parejas</span>
+            <span class="badge">${l.groups.length} grupos</span>
+            <span class="badge">${l.matches.length} partidos</span>
+            <span class="badge ok">${l.matches.filter(m=>m.played).length} jugados</span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function escapeHtml(str){
+  return String(str ?? '').replace(/[&<>"']/g, s => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[s]));
+}
+
+render();
+updateHeader();
+initFirebaseSync();
+</script>
+</body>
+</html>
