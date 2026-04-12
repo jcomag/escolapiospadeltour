@@ -270,8 +270,8 @@ const FIREBASE_CONFIG = {
 };
 const FIREBASE_COLLECTION = 'padel_apps';
 const FIREBASE_DOCUMENT_ID = 'liga_escolar_principal';
-const APP_VERSION = 'v42';
-const APP_VERSION_LABEL = 'v42 · Info de la aplicación';
+const APP_VERSION = 'v44';
+const APP_VERSION_LABEL = 'v44 · Pantalla comercial';
 
 const DEFAULT_STATE = {
   config: {
@@ -288,7 +288,9 @@ const DEFAULT_STATE = {
     adminTab: 'config',
     selectedLeagueId: 'future',
     showPostponedList: false,
-    calendarSearch: ''
+    calendarSearch: '',
+    adminMatchesSearch: '',
+    hiddenCalendarWeeks: { future: [], pro: [] }
   },
   resources: [],
   leagues: [
@@ -377,7 +379,9 @@ function loadState(){
 }
 function sanitizeStateForFirestore(source){
   const clean = deepClone(source);
-  delete clean.ui;
+  clean.ui = {
+    hiddenCalendarWeeks: deepClone(source?.ui?.hiddenCalendarWeeks || DEFAULT_STATE.ui.hiddenCalendarWeeks)
+  };
   return clean;
 }
 function saveState(options = {}){
@@ -1140,7 +1144,7 @@ function exportJSON(){
   const payload = {
     meta: {
       app: 'Liga de Pádel Escolar',
-      version: 'v38-news-con-imagen-estable',
+      version: APP_VERSION,
       exportedAt: new Date().toISOString(),
       note: 'Copia de seguridad completa para exportar e importar. Compatible con la versión Firebase en tiempo real.'
     },
@@ -1382,7 +1386,15 @@ function importJSONFile(file){
       const imported = JSON.parse(e.target.result);
       const sourceState = imported && imported.state ? imported.state : imported;
       const normalized = normalizeImportedState(sourceState);
-      normalized.ui = {...state.ui};
+      const transientUi = {
+        tab: state.ui.tab,
+        adminTab: state.ui.adminTab,
+        selectedLeagueId: state.ui.selectedLeagueId,
+        showPostponedList: state.ui.showPostponedList,
+        calendarSearch: state.ui.calendarSearch,
+        adminMatchesSearch: state.ui.adminMatchesSearch
+      };
+      normalized.ui = {...normalized.ui, ...transientUi};
       state = normalized;
       isAdmin = false;
       persistLocalBackup();
@@ -1669,6 +1681,7 @@ function matchCalendarSearch(league, match, searchValue){
 function renderCalendar(){
   const league = getLeague();
   const searchValue = String(state.ui.calendarSearch || '').trim();
+
   const filteredMatches = [...league.matches]
     .filter(m => matchCalendarSearch(league, m, searchValue))
     .sort((a,b)=>(a.scheduledDate||'9999').localeCompare(b.scheduledDate||'9999'));
@@ -1680,6 +1693,22 @@ function renderCalendar(){
     grouped[key].push(m);
   });
 
+  const visibleGroupedEntries = Object.entries(grouped).filter(([week]) => isAdmin || !isCalendarWeekHiddenForSpectators(league.id, week));
+  const hiddenWeeksCount = Object.keys(grouped).filter(week => isCalendarWeekHiddenForSpectators(league.id, week)).length;
+
+  if(!isAdmin && !visibleGroupedEntries.length){
+    return `
+      <div class="card">
+        ${renderLeaguePills()}
+        <div class="card-title" style="margin-top:14px">
+          <h3>Calendario · ${league.name}</h3>
+          <span class="badge gold">Sin semanas visibles</span>
+        </div>
+        <div class="empty">${searchValue ? 'No hay semanas visibles que coincidan con esa búsqueda.' : 'Ahora mismo no hay semanas visibles del calendario para los espectadores.'}</div>
+      </div>
+    `;
+  }
+
   return `
     <div class="card">
       ${renderLeaguePills()}
@@ -1687,6 +1716,27 @@ function renderCalendar(){
         <h3>Calendario · ${league.name}</h3>
         ${isAdmin ? `<button class="btn primary" onclick="openScheduleModal()">Generar calendario</button>` : ``}
       </div>
+
+      ${isAdmin ? `
+        <div class="card" style="margin:0 0 16px 0;padding:16px">
+          <div class="card-title" style="margin-bottom:10px">
+            <h3 style="margin:0;font-size:16px">Visibilidad por semanas para espectadores</h3>
+            <span class="badge blue">${getHiddenCalendarWeeksForLeague(league.id).length} oculta(s)</span>
+          </div>
+          ${Object.keys(grouped).length ? `
+            <div class="chip-list">
+              ${Object.keys(grouped).map(week => `
+                <button class="btn small ${isCalendarWeekHiddenForSpectators(league.id, week) ? 'good' : 'warn'}" onclick="toggleCalendarWeekVisibility('${league.id}','${escapeHtml(week)}')">
+                  ${isCalendarWeekHiddenForSpectators(league.id, week) ? 'Mostrar' : 'Ocultar'} ${escapeHtml(week)}
+                </button>
+              `).join('')}
+            </div>
+          ` : `<div class="small-note">Cuando haya partidos programados por semana, podrás decidir aquí cuáles se muestran y cuáles se ocultan a los espectadores.</div>`}
+          <div class="small-note" style="margin-top:10px">
+            Desde aquí puedes ocultar o mostrar semanas concretas del calendario para espectadores. Como administrador seguirás viendo siempre todas las semanas.
+          </div>
+        </div>
+      ` : `${hiddenWeeksCount ? `<div class="small-note" style="margin:-4px 0 12px 0">Hay semanas del calendario ocultas por administración.</div>` : ``}`}
 
       <div class="card" style="margin:0 0 16px 0;padding:16px">
         <div class="form-grid">
@@ -1707,12 +1757,15 @@ function renderCalendar(){
         </div>
       </div>
 
-      ${searchValue ? `<div class="small-note" style="margin-bottom:12px">Filtro activo: <strong style="color:var(--txt)">${escapeHtml(searchValue)}</strong> · ${filteredMatches.length} partido(s) encontrado(s).</div>` : ``}
+      ${searchValue ? `<div class="small-note" style="margin-bottom:12px">Filtro activo: <strong style="color:var(--txt)">${escapeHtml(searchValue)}</strong> · ${visibleGroupedEntries.reduce((acc,[,matches]) => acc + matches.length, 0)} partido(s) visible(s).</div>` : ``}
 
-      ${Object.keys(grouped).length ? Object.entries(grouped).map(([week,matches])=>`
+      ${visibleGroupedEntries.length ? visibleGroupedEntries.map(([week,matches])=>`
         <div class="group-card" style="margin-bottom:12px">
           <div class="group-head">
-            <strong>${week}</strong>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <strong>${week}</strong>
+              ${isAdmin ? `<span class="badge ${isCalendarWeekHiddenForSpectators(league.id, week) ? 'gold' : 'ok'}">${isCalendarWeekHiddenForSpectators(league.id, week) ? 'Oculta para espectadores' : 'Visible para espectadores'}</span>` : ``}
+            </div>
             <span class="small-note">${matches.length} partido(s)</span>
           </div>
           ${matches.map(m=>{
@@ -1732,7 +1785,7 @@ function renderCalendar(){
             </div>`;
           }).join('')}
         </div>
-      `).join('') : `<div class="empty">${searchValue ? 'No hay partidos que coincidan con esa búsqueda.' : 'No hay partidos programados todavía.'}</div>`}
+      `).join('') : `<div class="empty">${searchValue ? 'No hay partidos visibles que coincidan con esa búsqueda.' : 'No hay partidos programados todavía.'}</div>`}
     </div>
   `;
 }
@@ -2391,14 +2444,69 @@ function changePairGroupNoRender(pairId, groupId, leagueId){
   }
 }
 
+
+function setAdminMatchesSearch(){
+  const input = document.getElementById('adminMatchesSearchInput');
+  state.ui.adminMatchesSearch = (input?.value || '').trim();
+  saveState({skipRemote:true});
+  render();
+}
+function clearAdminMatchesSearch(){
+  state.ui.adminMatchesSearch = '';
+  saveState({skipRemote:true});
+  render();
+}
+function matchAdminMatchesSearch(league, match, searchValue){
+  const term = String(searchValue || '').trim().toLowerCase();
+  if(!term) return true;
+  const pairA = league.pairs.find(p=>p.id===match.pairAId);
+  const pairB = league.pairs.find(p=>p.id===match.pairBId);
+  const group = league.groups.find(g=>g.id===match.groupId);
+  const haystack = [
+    pairA?.j1 || '', pairA?.j2 || '',
+    pairB?.j1 || '', pairB?.j2 || '',
+    `${pairA?.j1 || ''} ${pairA?.j2 || ''}`,
+    `${pairB?.j1 || ''} ${pairB?.j2 || ''}`,
+    `${pairA?.j1 || ''} / ${pairA?.j2 || ''}`,
+    `${pairB?.j1 || ''} / ${pairB?.j2 || ''}`,
+    group?.name || '',
+    match.scheduledDate || '',
+    match.scheduledWeek || ''
+  ].join(' ').toLowerCase();
+  return haystack.includes(term);
+}
+function getHiddenCalendarWeeksForLeague(leagueId){
+  const map = state.ui.hiddenCalendarWeeks || {};
+  const list = Array.isArray(map[leagueId]) ? map[leagueId] : [];
+  return [...new Set(list.map(v => String(v || '').trim()).filter(Boolean))];
+}
+function isCalendarWeekHiddenForSpectators(leagueId, weekLabel){
+  return getHiddenCalendarWeeksForLeague(leagueId).includes(String(weekLabel || 'Sin semana'));
+}
+function toggleCalendarWeekVisibility(leagueId, weekLabel){
+  const key = String(weekLabel || 'Sin semana');
+  state.ui.hiddenCalendarWeeks = state.ui.hiddenCalendarWeeks || {};
+  const current = getHiddenCalendarWeeksForLeague(leagueId);
+  const hidden = current.includes(key);
+  state.ui.hiddenCalendarWeeks[leagueId] = hidden
+    ? current.filter(w => w !== key)
+    : [...current, key].sort((a,b) => a.localeCompare(b));
+  saveState();
+  render();
+  toast(hidden ? `Semana ${key} visible para espectadores` : `Semana ${key} oculta para espectadores`);
+}
+
 function renderAdminMatches(league){
-  const allMatches = [...league.matches].sort((a,b) => {
-    const dateA = a.scheduledDate || '9999-99-99';
-    const dateB = b.scheduledDate || '9999-99-99';
-    if(dateA !== dateB) return dateA.localeCompare(dateB);
-    if(a.played !== b.played) return a.played - b.played;
-    return (a.scheduledWeek || '').localeCompare(b.scheduledWeek || '') || a.id.localeCompare(b.id);
-  });
+  const adminSearchValue = String(state.ui.adminMatchesSearch || '').trim();
+  const allMatches = [...league.matches]
+    .filter(m => matchAdminMatchesSearch(league, m, adminSearchValue))
+    .sort((a,b) => {
+      const dateA = a.scheduledDate || '9999-99-99';
+      const dateB = b.scheduledDate || '9999-99-99';
+      if(dateA !== dateB) return dateA.localeCompare(dateB);
+      if(a.played !== b.played) return a.played - b.played;
+      return (a.scheduledWeek || '').localeCompare(b.scheduledWeek || '') || a.id.localeCompare(b.id);
+    });
   const pending = allMatches.filter(m=>!m.played).length;
   const played = allMatches.filter(m=>m.played).length;
   return `
@@ -2423,8 +2531,27 @@ function renderAdminMatches(league){
     </div>
 
     <div class="card" style="margin-top:16px">
+      <div class="card-title"><h3>Buscar partidos por pareja</h3><span class="badge blue">Solo administración</span></div>
+      <div class="form-grid">
+        <div class="field c8">
+          <label>Buscar partido</label>
+          <input id="adminMatchesSearchInput" value="${escapeHtml(adminSearchValue)}" placeholder="Escribe nombre o apellidos de cualquier jugador/a de la pareja">
+        </div>
+        <div class="field c4">
+          <label>&nbsp;</label>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn primary" onclick="setAdminMatchesSearch()">Buscar</button>
+            <button class="btn" onclick="clearAdminMatchesSearch()">Mostrar todos</button>
+          </div>
+        </div>
+      </div>
+      <div class="small-note" style="margin-top:10px">El buscador revisa ambos jugadores de cada pareja, además del grupo y la semana, para localizar partidos mucho más rápido.</div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
       <div class="card-title"><h3>Partidos pendientes y jugados (${allMatches.length})</h3><span class="badge">${pending} pendientes · ${played} jugados</span></div>
-      ${allMatches.length ? allMatches.map(m => renderAdminMatchLine(league,m)).join('') : `<div class="empty">Todavía no hay partidos creados.</div>`}
+      ${adminSearchValue ? `<div class="small-note" style="margin-bottom:12px">Filtro activo: <strong style="color:var(--txt)">${escapeHtml(adminSearchValue)}</strong>.</div>` : ``}
+      ${allMatches.length ? allMatches.map(m => renderAdminMatchLine(league,m)).join('') : `<div class="empty">${adminSearchValue ? 'No hay partidos que coincidan con esa búsqueda.' : 'Todavía no hay partidos creados.'}</div>`}
     </div>
   `;
 }
@@ -2942,82 +3069,154 @@ function renderAdminInfo(){
   return `
     <div class="grid grid-2">
       <div class="card" style="margin:0">
-        <div class="card-title"><h3>Versión de la aplicación</h3></div>
-        <div class="callout">
+        <div class="callout" style="height:100%">
           <div class="badge blue" style="margin-bottom:10px">${APP_VERSION_LABEL}</div>
-          <div style="font-size:22px;font-weight:800;margin-bottom:8px">${APP_VERSION}</div>
-          <div class="small-note">Esta pestaña sirve como ficha rápida para recordar qué hace la web y qué herramientas tienes disponibles como administrador.</div>
+          <div style="font-size:30px;font-weight:800;line-height:1.1;margin-bottom:10px">
+            Una web profesional para organizar tu liga de pádel de principio a fin
+          </div>
+          <p class="small-note" style="font-size:14px;line-height:1.7;color:var(--txt);margin:0 0 16px">
+            Pensada para centros educativos, clubes y torneos internos que necesitan una herramienta visual,
+            intuitiva y completa para gestionar inscripciones, calendario, resultados, clasificación y comunicación con jugadores y espectadores.
+          </p>
+          <div class="chip-list">
+            <span class="badge ok">Gestión integral</span>
+            <span class="badge gold">Vista pública</span>
+            <span class="badge blue">Panel admin</span>
+            <span class="badge violet">Sincronización online</span>
+          </div>
         </div>
       </div>
+
       <div class="card" style="margin:0">
-        <div class="card-title"><h3>Introducción</h3></div>
-        <p class="small-note" style="font-size:14px;line-height:1.7;color:var(--txt)">
-          Esta aplicación está diseñada para gestionar ligas y torneos de pádel de forma visual, intuitiva y centralizada, facilitando tanto la organización como el seguimiento por parte de jugadores y espectadores.
-          Permite organizar parejas, grupos, calendario, clasificación, playoffs, avisos y recursos de apoyo,
-          manteniendo una parte pública para espectadores y una parte privada para administración.
-        </p>
+        <div class="card-title"><h3>Resumen comercial</h3></div>
+        <div class="stats">
+          <div class="stat"><small>Versión</small><strong>${APP_VERSION}</strong></div>
+          <div class="stat"><small>Ligas simultáneas</small><strong>2</strong></div>
+          <div class="stat"><small>Vista pública</small><strong>Sí</strong></div>
+          <div class="stat"><small>Gestión admin</small><strong>Total</strong></div>
+        </div>
+        <div class="group-card" style="margin-top:14px">
+          <strong>Qué resuelve esta aplicación</strong>
+          <p class="small-note" style="margin-top:8px">
+            Evita hojas dispersas, cuadrantes manuales y mensajes confusos. Centraliza toda la competición en una sola web
+            para que la organización sea más rápida y los participantes sepan siempre qué les toca jugar, cuándo y cómo va la clasificación.
+          </p>
+        </div>
       </div>
     </div>
 
     <div class="card" style="margin-top:16px">
-      <div class="card-title"><h3>Guion de funcionalidades</h3></div>
+      <div class="card-title"><h3>Puntos fuertes para presentar o vender la aplicación</h3></div>
+      <div class="grid grid-3">
+        <div class="group-card">
+          <strong>Visual y fácil de usar</strong>
+          <p class="small-note">Diseño claro, moderno y cómodo para alumnado, familias, profesorado, clubes o participantes.</p>
+        </div>
+        <div class="group-card">
+          <strong>Organización centralizada</strong>
+          <p class="small-note">Parejas, grupos, partidos, resultados, avisos y playoffs en un único espacio.</p>
+        </div>
+        <div class="group-card">
+          <strong>Comunicación directa</strong>
+          <p class="small-note">Los espectadores pueden consultar calendario, clasificación, normas, avisos y contenidos sin necesidad de preguntar constantemente.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-title"><h3>Características principales</h3></div>
       <div class="grid grid-2">
+
         <div class="group-card">
-          <strong>1. Estructura general</strong>
-          <p class="small-note">Dos ligas configurables, cabecera editable, logo, temporada, pestañas públicas y panel de administración protegido por contraseña.</p>
+          <strong>1. Gestión de ligas</strong>
+          <p class="small-note">Dos ligas configurables con nombres independientes, cabecera personalizable, temporada editable y logo propio.</p>
         </div>
+
         <div class="group-card">
-          <strong>2. Gestión de parejas</strong>
-          <p class="small-note">Alta, edición y borrado de parejas, cursos y niveles, pago, jugador reserva, warnings, motivo del warning, estado y días no disponibles.</p>
+          <strong>2. Gestión completa de parejas</strong>
+          <p class="small-note">Alta, edición y eliminación de parejas con cursos, niveles, pago, reserva, warnings y días no disponibles.</p>
         </div>
+
         <div class="group-card">
-          <strong>3. Grupos</strong>
-          <p class="small-note">Creación manual o automática de grupos, asignación y reasignación de parejas, cambio de nombre de grupos y generación inicial de enfrentamientos.</p>
+          <strong>3. Creación de grupos</strong>
+          <p class="small-note">Grupos manuales o automáticos con asignación flexible y reorganización rápida de parejas.</p>
         </div>
+
         <div class="group-card">
-          <strong>4. Partidos y calendario</strong>
-          <p class="small-note">Partidos manuales, calendario automático semanal o mensual, control de duplicados por vuelta, edición de fecha, observaciones visibles y marcaje de aplazados.</p>
+          <strong>4. Generación de partidos</strong>
+          <p class="small-note">Partidos automáticos o manuales con control de duplicados, vueltas y coherencia de grupos.</p>
         </div>
+
         <div class="group-card">
-          <strong>5. Clasificación</strong>
-          <p class="small-note">Cálculo automático de puntos, partidos jugados, diferencia de juegos, programados, pendientes y aplazados, con vista pública y datos extra para administración.</p>
+          <strong>5. Calendario inteligente</strong>
+          <p class="small-note">Generación semanal o mensual, reparto equilibrado y edición rápida de fechas y observaciones.</p>
         </div>
+
         <div class="group-card">
-          <strong>6. Warnings y disciplina</strong>
-          <p class="small-note">Contador de warnings por pareja, motivo asociado, visualización pública del warning, estado interno de la pareja y expulsión automática al llegar a 3 warnings.</p>
+          <strong>6. Visibilidad por semanas</strong>
+          <p class="small-note">El administrador puede ocultar o mostrar semanas concretas del calendario para los espectadores.</p>
         </div>
+
         <div class="group-card">
-          <strong>7. Playoffs</strong>
-          <p class="small-note">Generación automática del cuadro, cálculo de clasificados, introducción de resultados y avance del cuadro hasta la final.</p>
+          <strong>7. Buscador por parejas</strong>
+          <p class="small-note">Búsqueda rápida de partidos por nombre o apellidos para localizar enfrentamientos en segundos.</p>
         </div>
+
         <div class="group-card">
-          <strong>8. Partidos aplazados</strong>
-          <p class="small-note">Pestaña específica para listar todos los partidos aplazados y gestionarlos desde ahí: fecha, resultado, observaciones y cambio de estado.</p>
+          <strong>8. Clasificación automática</strong>
+          <p class="small-note">Cálculo de puntos, partidos jugados, diferencia de juegos, pendientes y aplazados por grupo.</p>
         </div>
+
         <div class="group-card">
-          <strong>9. Normas</strong>
-          <p class="small-note">Pantalla pública para mostrar una imagen grande con el reglamento, cartel o información general de la competición.</p>
+          <strong>9. Control disciplinario</strong>
+          <p class="small-note">Sistema de warnings con motivo asociado y expulsión automática al llegar al límite configurado.</p>
         </div>
+
         <div class="group-card">
-          <strong>10. News</strong>
-          <p class="small-note">Tablón público de novedades con texto e imagen. La pestaña puede resaltar cuando hay avisos importantes para los espectadores.</p>
+          <strong>10. Playoffs automáticos</strong>
+          <p class="small-note">Generación del cuadro final y avance automático de cruces según los resultados introducidos.</p>
         </div>
+
         <div class="group-card">
-          <strong>11. Contenidos</strong>
-          <p class="small-note">Repositorio público de enlaces y recursos sobre pádel o sobre la liga. El administrador puede añadir, editar, borrar y reordenar contenidos.</p>
+          <strong>11. Gestión de aplazados</strong>
+          <p class="small-note">Pantalla específica para listar, revisar y reprogramar partidos aplazados.</p>
         </div>
+
         <div class="group-card">
-          <strong>12. Copias de seguridad</strong>
-          <p class="small-note">Exportación de JSON para restauración completa de la web y exportación de Excel como visualización resumida de la información importante.</p>
+          <strong>12. News y avisos</strong>
+          <p class="small-note">Tablón de novedades para comunicar cambios, recordatorios o información importante de la liga.</p>
         </div>
+
         <div class="group-card">
-          <strong>13. Sincronización</strong>
-          <p class="small-note">Guardado local y sincronización con Firebase para mantener los datos entre sesiones y dispositivos cuando la configuración remota está activa.</p>
+          <strong>13. Normas visuales</strong>
+          <p class="small-note">Sección pensada para proyectar reglas, carteles o información relevante mediante imagen.</p>
         </div>
+
         <div class="group-card">
-          <strong>14. Uso recomendado</strong>
-          <p class="small-note">Ideal para ligas escolares, torneos internos o clubes que quieran una gestión clara, visual y fácil de seguir también por jugadores y espectadores. Incluye buscador de partidos por pareja, gestión avanzada de contenidos y comunicación directa mediante News.</p>
+          <strong>14. Contenidos extra</strong>
+          <p class="small-note">Repositorio de vídeos, enlaces y recursos relacionados con el pádel o con la propia competición.</p>
         </div>
+
+        <div class="group-card">
+          <strong>15. Copias de seguridad</strong>
+          <p class="small-note">Exportación en JSON para restauración completa y Excel para consulta visual y seguimiento.</p>
+        </div>
+
+        <div class="group-card">
+          <strong>16. Sincronización con Firebase</strong>
+          <p class="small-note">Guardado online para mantener datos actualizados entre sesiones y distintos dispositivos.</p>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-title"><h3>Ideal para...</h3></div>
+      <div class="grid grid-4">
+        <div class="group-card"><strong>Colegios e institutos</strong><p class="small-note">Ligas internas por cursos o etapas.</p></div>
+        <div class="group-card"><strong>Clubes de pádel</strong><p class="small-note">Torneos sociales, ligas internas y pruebas por niveles.</p></div>
+        <div class="group-card"><strong>Asociaciones</strong><p class="small-note">Competiciones periódicas con difusión pública.</p></div>
+        <div class="group-card"><strong>Eventos deportivos</strong><p class="small-note">Cuadros sencillos de seguir y gestionar.</p></div>
       </div>
     </div>
   `;
