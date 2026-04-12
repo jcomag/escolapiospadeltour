@@ -270,8 +270,8 @@ const FIREBASE_CONFIG = {
 };
 const FIREBASE_COLLECTION = 'padel_apps';
 const FIREBASE_DOCUMENT_ID = 'liga_escolar_principal';
-const APP_VERSION = 'v44';
-const APP_VERSION_LABEL = 'v44 · Pantalla comercial';
+const APP_VERSION = 'v47';
+const APP_VERSION_LABEL = 'v47 · Semanas sincronizadas';
 
 const DEFAULT_STATE = {
   config: {
@@ -289,8 +289,7 @@ const DEFAULT_STATE = {
     selectedLeagueId: 'future',
     showPostponedList: false,
     calendarSearch: '',
-    adminMatchesSearch: '',
-    hiddenCalendarWeeks: { future: [], pro: [] }
+    adminMatchesSearch: ''
   },
   resources: [],
   leagues: [
@@ -302,7 +301,8 @@ const DEFAULT_STATE = {
       pairs: [],
       groups: [],
       matches: [],
-      playoffMatches: []
+      playoffMatches: [],
+      hiddenWeeks: []
     },
     {
       id: 'pro',
@@ -312,7 +312,8 @@ const DEFAULT_STATE = {
       pairs: [],
       groups: [],
       matches: [],
-      playoffMatches: []
+      playoffMatches: [],
+      hiddenWeeks: []
     }
   ]
 };
@@ -347,11 +348,22 @@ function persistLocalBackup(){
     localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(state));
   }catch(e){}
 }
+function migrateLegacyHiddenWeeks(stateObj){
+  if(!stateObj || !Array.isArray(stateObj.leagues)) return stateObj;
+  const legacyMap = stateObj?.ui?.hiddenCalendarWeeks || {};
+  stateObj.leagues.forEach(league => {
+    const current = Array.isArray(league.hiddenWeeks) ? league.hiddenWeeks : [];
+    const legacy = Array.isArray(legacyMap[league.id]) ? legacyMap[league.id] : [];
+    league.hiddenWeeks = [...new Set([...current, ...legacy].map(v => String(v || '').trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+  });
+  if(stateObj.ui && stateObj.ui.hiddenCalendarWeeks) delete stateObj.ui.hiddenCalendarWeeks;
+  return stateObj;
+}
 function loadState(){
   try{
     const raw = localStorage.getItem(LOCAL_BACKUP_KEY);
     if(!raw) return deepClone(DEFAULT_STATE);
-    const parsed = JSON.parse(raw);
+    const parsed = migrateLegacyHiddenWeeks(JSON.parse(raw));
     const merged = deepClone(DEFAULT_STATE);
     merged.config = {...merged.config, ...(parsed.config||{})};
     merged.ui = {...merged.ui, ...(parsed.ui||{})};
@@ -370,7 +382,8 @@ function loadState(){
       pairs: Array.isArray(lg.pairs) ? lg.pairs.map(p => ({...p, warnings: Math.max(0, Number(p?.warnings || 0) || 0), warningNote: String(p?.warningNote || '')})) : [],
       groups: Array.isArray(lg.groups) ? lg.groups : [],
       matches: Array.isArray(lg.matches) ? lg.matches : [],
-      playoffMatches: Array.isArray(lg.playoffMatches) ? lg.playoffMatches : []
+      playoffMatches: Array.isArray(lg.playoffMatches) ? lg.playoffMatches : [],
+      hiddenWeeks: Array.isArray(lg.hiddenWeeks) ? [...new Set(lg.hiddenWeeks.map(v => String(v || '').trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b)) : []
     }));
     return merged;
   }catch(e){
@@ -378,11 +391,7 @@ function loadState(){
   }
 }
 function sanitizeStateForFirestore(source){
-  const clean = deepClone(source);
-  clean.ui = {
-    hiddenCalendarWeeks: deepClone(source?.ui?.hiddenCalendarWeeks || DEFAULT_STATE.ui.hiddenCalendarWeeks)
-  };
-  return clean;
+  return migrateLegacyHiddenWeeks(deepClone(source));
 }
 function saveState(options = {}){
   persistLocalBackup();
@@ -417,7 +426,7 @@ function scheduleRemoteSave(){
 }
 function applyRemoteState(remote){
   const normalized = normalizeImportedState(remote);
-  normalized.ui = {...state.ui};
+  normalized.ui = {...normalized.ui, ...state.ui};
   state = normalized;
   persistLocalBackup();
   render();
@@ -1077,18 +1086,19 @@ function parseBool(value){
   return ['si','sí','true','1','yes','x'].includes(v);
 }
 function normalizeImportedState(imported){
-  validateImportedState(imported);
+  const importedWithMigration = migrateLegacyHiddenWeeks(deepClone(imported));
+  validateImportedState(importedWithMigration);
   const merged = deepClone(DEFAULT_STATE);
-  merged.config = Object.assign({}, merged.config, imported.config || {});
-  merged.ui = Object.assign({}, merged.ui, imported.ui || {});
-  merged.resources = Array.isArray(imported.resources) ? imported.resources.map(resource => ({
-    id: resource.id || uid('res'),
-    title: String(resource.title || ''),
-    url: String(resource.url || ''),
-    description: String(resource.description || ''),
-    type: String(resource.type || 'Enlace')
-  })) : [];
-  merged.leagues = Array.isArray(imported.leagues) ? imported.leagues.map((league, idx) => {
+  merged.config = Object.assign({}, merged.config, importedWithMigration.config || {});
+  merged.ui = Object.assign({}, merged.ui, importedWithMigration.ui || {});
+  merged.resources = Array.isArray(importedWithMigration.resources) ? importedWithMigration.resources.map(resource => ({
+      id: resource.id || uid('res'),
+      title: String(resource.title || ''),
+      url: String(resource.url || ''),
+      description: String(resource.description || ''),
+      type: String(resource.type || 'Enlace')
+    })) : [];
+  merged.leagues = Array.isArray(importedWithMigration.leagues) ? importedWithMigration.leagues.map((league, idx) => {
     const base = deepClone(DEFAULT_STATE.leagues[idx] || {
       id: uid('league'),
       name: 'Liga',
@@ -1097,7 +1107,8 @@ function normalizeImportedState(imported){
       pairs: [],
       groups: [],
       matches: [],
-      playoffMatches: []
+      playoffMatches: [],
+      hiddenWeeks: []
     });
     const normalized = Object.assign(base, league || {});
     normalized.pairs = Array.isArray(normalized.pairs) ? normalized.pairs.map(pair => ({
@@ -1136,6 +1147,7 @@ function normalizeImportedState(imported){
       postponed: !!match.postponed
     })) : [];
     normalized.playoffMatches = Array.isArray(normalized.playoffMatches) ? normalized.playoffMatches : [];
+    normalized.hiddenWeeks = Array.isArray(normalized.hiddenWeeks) ? [...new Set(normalized.hiddenWeeks.map(v => String(v || '').trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b)) : [];
     return normalized;
   }) : deepClone(DEFAULT_STATE.leagues);
   return merged;
@@ -2476,19 +2488,20 @@ function matchAdminMatchesSearch(league, match, searchValue){
   return haystack.includes(term);
 }
 function getHiddenCalendarWeeksForLeague(leagueId){
-  const map = state.ui.hiddenCalendarWeeks || {};
-  const list = Array.isArray(map[leagueId]) ? map[leagueId] : [];
-  return [...new Set(list.map(v => String(v || '').trim()).filter(Boolean))];
+  const league = state.leagues.find(l => l.id === leagueId);
+  const list = Array.isArray(league?.hiddenWeeks) ? league.hiddenWeeks : [];
+  return [...new Set(list.map(v => String(v || '').trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
 }
 function isCalendarWeekHiddenForSpectators(leagueId, weekLabel){
   return getHiddenCalendarWeeksForLeague(leagueId).includes(String(weekLabel || 'Sin semana'));
 }
 function toggleCalendarWeekVisibility(leagueId, weekLabel){
   const key = String(weekLabel || 'Sin semana');
-  state.ui.hiddenCalendarWeeks = state.ui.hiddenCalendarWeeks || {};
+  const league = state.leagues.find(l => l.id === leagueId);
+  if(!league) return;
   const current = getHiddenCalendarWeeksForLeague(leagueId);
   const hidden = current.includes(key);
-  state.ui.hiddenCalendarWeeks[leagueId] = hidden
+  league.hiddenWeeks = hidden
     ? current.filter(w => w !== key)
     : [...current, key].sort((a,b) => a.localeCompare(b));
   saveState();
